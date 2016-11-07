@@ -2,7 +2,8 @@ import numpy as np
 import scipy.sparse as sparse
 
 from util import *
-      
+import fem
+
 def nodalCoarseElementMatrix(NCoarseElement):
     NpFine = np.prod(NCoarseElement+1)
     NpCoarse = 2**np.size(NCoarseElement)
@@ -21,6 +22,30 @@ def nodalPatchMatrix(iPatchCoarse, NPatchCoarse, NWorldCoarse, NCoarseElement):
     INodalPatch = AvgPatch*IPatch
     return INodalPatch
     
+def L2ProjectionCoarseElementMatrix(NCoarseElement):
+    NpFine = np.prod(NCoarseElement+1)
+    NpCoarse = 2**np.size(NCoarseElement)
+    
+    MLoc = fem.localMassMatrix(NCoarseElement)
+    MElement = fem.assemblePatchMatrix(NCoarseElement, MLoc)
+    Phi = np.column_stack(fem.localBasis(NCoarseElement))
+
+    PhiTM = Phi.T*MElement
+    PhiTMPhi = PhiTM*Phi
+
+    IDense = np.linalg.inv(PhiTMPhi)*PhiTM
+    I = sparse.coo_matrix(IDense)
+    return I
+
+def L2ProjectionPatchMatrix(iPatchCoarse, NPatchCoarse, NWorldCoarse, NCoarseElement):
+    NPatchFine = NPatchCoarse*NCoarseElement
+    
+    IElement = L2ProjectionCoarseElementMatrix(NCoarseElement)
+    IPatch = assemblePatchInterpolationMatrix(IElement, NPatchFine, NCoarseElement)
+    AvgPatch = assemblePatchNodeAveragingMatrix(iPatchCoarse, NPatchCoarse, NWorldCoarse)
+    INodalPatch = AvgPatch*IPatch
+    return IL2ProjectionPatch
+
 def assemblePatchInterpolationMatrix(IElement, NPatchFine, NCoarseElement):
     assert np.all(np.mod(NPatchFine, NCoarseElement) == 0)
 

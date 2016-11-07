@@ -4,7 +4,12 @@ def linearpIndexBasis(N):
     cp = np.cumprod(N+1)
     b = np.hstack([[1], cp[:-1]])
     return b
-        
+
+def interiorpIndexMap(N):
+    preIndexMap = lowerLeftpIndexMap(N-2, N)
+    indexMap = np.sum(linearpIndexBasis(N))+preIndexMap
+    return indexMap
+
 def pIndexMap(NFrom, NTo, NStep):
     NTopBasis = linearpIndexBasis(NTo)
     NTopBasis = NStep*NTopBasis

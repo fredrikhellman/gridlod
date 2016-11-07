@@ -58,3 +58,16 @@ def assemblePatchMatrix(NPatch, ALoc=None, aPatch=None):
     
     return APatch
 
+def localBasis(N):
+    d = np.size(N)
+
+    Phis = [1]
+    for k in range(d): 
+        x = np.linspace(0,1,N[k]+1)
+        newPhis0 = []
+        newPhis1 = []
+        for Phi in Phis:
+            newPhis0.append(np.kron(1-x, Phi))
+            newPhis1.append(np.kron(x, Phi))
+        Phis = newPhis0 + newPhis1
+    return Phis
