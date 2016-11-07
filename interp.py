@@ -31,9 +31,9 @@ def L2ProjectionCoarseElementMatrix(NCoarseElement):
     Phi = np.column_stack(fem.localBasis(NCoarseElement))
 
     PhiTM = Phi.T*MElement
-    PhiTMPhi = PhiTM*Phi
+    PhiTMPhi = np.dot(PhiTM, Phi)
 
-    IDense = np.linalg.inv(PhiTMPhi)*PhiTM
+    IDense = np.dot(np.linalg.inv(PhiTMPhi), PhiTM)
     I = sparse.coo_matrix(IDense)
     return I
 
@@ -43,7 +43,7 @@ def L2ProjectionPatchMatrix(iPatchCoarse, NPatchCoarse, NWorldCoarse, NCoarseEle
     IElement = L2ProjectionCoarseElementMatrix(NCoarseElement)
     IPatch = assemblePatchInterpolationMatrix(IElement, NPatchFine, NCoarseElement)
     AvgPatch = assemblePatchNodeAveragingMatrix(iPatchCoarse, NPatchCoarse, NWorldCoarse)
-    INodalPatch = AvgPatch*IPatch
+    IL2ProjectionPatch = AvgPatch*IPatch
     return IL2ProjectionPatch
 
 def assemblePatchInterpolationMatrix(IElement, NPatchFine, NCoarseElement):

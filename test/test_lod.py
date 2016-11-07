@@ -24,7 +24,7 @@ class computeElementCorrectorDirichletBC_TestCase(unittest.TestCase):
                                                aFlatPatchFine[elementFineIndex + elementToFineIndexMap])
         
         localBasis = fem.localBasis(NCoarseElement)
-        IElement = interp.nodalCoarseElementMatrix(NCoarseElement)
+        IPatch = interp.nodalPatchMatrix(np.array([0, 0]), NPatchCoarse, NPatchCoarse, NCoarseElement)
         
         correctorsFull = lod.computeElementCorrectorDirichletBC(NPatchCoarse,
                                                                 NCoarseElement,
@@ -32,7 +32,7 @@ class computeElementCorrectorDirichletBC_TestCase(unittest.TestCase):
                                                                 APatchFull,
                                                                 AElementFull,
                                                                 localBasis,
-                                                                IElement)
+                                                                IPatch)
 
         # Test zeros at coarse points
         coarseIndices = util.fillpIndexMap(NPatchCoarse, NPatchFine)
@@ -53,10 +53,10 @@ class computeElementCorrectorDirichletBC_TestCase(unittest.TestCase):
         self.assertTrue(np.linalg.norm(reduce(np.add, correctorsFull)) < 1e-12)
 
     def test_writefile(self):
-        NPatchCoarse = np.array([18,18,18])
-        NCoarseElement = np.array([2,2,2])
+        NPatchCoarse = np.array([5,5,5])
+        NCoarseElement = np.array([3,3,3])
         NPatchFine = NPatchCoarse*NCoarseElement
-        iElementCoarse = np.array([9,9,9])
+        iElementCoarse = np.array([2,2,2])
         aFlatPatchFine = np.ones(np.prod(NPatchFine))
         aFlatPatchFine = np.exp(8*np.random.rand(np.prod(NPatchFine)))
         
@@ -70,7 +70,7 @@ class computeElementCorrectorDirichletBC_TestCase(unittest.TestCase):
                                                aFlatPatchFine[elementFineIndex + elementToFineIndexMap])
         
         localBasis = fem.localBasis(NCoarseElement)
-        IElement = interp.nodalCoarseElementMatrix(NCoarseElement)
+        IPatch = interp.L2ProjectionPatchMatrix(np.array([0, 0, 0]), NPatchCoarse, NPatchCoarse, NCoarseElement)
         
         correctorsFull = lod.computeElementCorrectorDirichletBC(NPatchCoarse,
                                                                 NCoarseElement,
@@ -78,7 +78,7 @@ class computeElementCorrectorDirichletBC_TestCase(unittest.TestCase):
                                                                 APatchFull,
                                                                 AElementFull,
                                                                 localBasis,
-                                                                IElement)
+                                                                IPatch)
 
         pointData = dict([('corrector_'+str(i), corrector.reshape(NPatchFine+1)) for i, corrector in enumerate(correctorsFull)])
         

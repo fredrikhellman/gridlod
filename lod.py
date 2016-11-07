@@ -4,6 +4,7 @@ import scipy.sparse.linalg
 
 import fem
 import util
+import linalg
 
 #def computeElementCorrector(NPatchCoarse,
 #                            NCoarseElement,
@@ -20,7 +21,7 @@ def computeElementCorrectorDirichletBC(NPatchCoarse,
                                        APatchFull,
                                        AElementFull,
                                        localBasis,
-                                       IElement):
+                                       IPatch):
     d = np.size(NPatchCoarse)
     NPatchFine = NPatchCoarse*NCoarseElement
     NpFine = np.prod(NPatchFine+1)
@@ -28,15 +29,12 @@ def computeElementCorrectorDirichletBC(NPatchCoarse,
     elementToFineIndexMap = util.lowerLeftpIndexMap(NCoarseElement, NPatchFine)
 
     fixedIPatch = None
-    # If IElement is nodal interpolation, then don't use Lagrange
+    # If IPatch is nodal interpolation, then don't use Lagrange
     # multipliers, instead remove degrees of freedom
-    if IElement.nnz == IElement.shape[0]:
-        fixedILocal = elementToFineIndexMap[IElement.col]
-        fixedIPatch = np.add.outer(util.pIndexMap(NPatchCoarse-1, NPatchFine, NCoarseElement),
-                                   fixedILocal).flatten()
-        fixedIPatch = np.sort(fixedIPatch)
-    else:
-        raise('Lagrange multipliers not yet implemented')
+    if IPatch.nnz == IPatch.shape[0]:
+        IPatchCoo = IPatch.tocoo()
+        fixedIPatch = np.sort(IPatchCoo.col)
+        IPatch = None
 
     # Find patch free degrees of freedom
     freePatch = util.interiorpIndexMap(NPatchFine)
@@ -48,15 +46,27 @@ def computeElementCorrectorDirichletBC(NPatchCoarse,
     fineIndexBasis = util.linearpIndexBasis(NPatchFine)
     elementFineIndex = np.dot(fineIndexBasis, iElementCoarse*NCoarseElement)
     bFull = np.zeros(NpFine)
-    correctorsFull = []
-    for i in range(len(localBasis)):
-        bFull[elementFineIndex + elementToFineIndexMap] = AElementFull*localBasis[i]
-        bFree = bFull[freePatch]
-        correctorFree,_ = sparse.linalg.cg(APatchFree, bFree, tol=1e-4)
+    bFreeList = []
+    for phi in localBasis:
+        bFull[elementFineIndex + elementToFineIndexMap] = AElementFull*phi
+        bFreeList.append(bFull[freePatch])
+
+    if IPatch is None:
+        correctorFreeList = []
+        for bFree in bFreeList:
+            correctorFree,_ = sparse.linalg.cg(APatchFree, bFree, tol=1e-9)
+            correctorFreeList.append(correctorFree)
+    else:
+        IPatchFree = IPatch[:,freePatch]
+        correctorFreeList = linalg.saddle(APatchFree, IPatchFree, bFreeList)
+
+    correctorFullList = []
+    for correctorFree in correctorFreeList:
         correctorFull = np.zeros(NpFine)
         correctorFull[freePatch] = correctorFree
-        correctorsFull.append(correctorFull)
-    return correctorsFull
+        correctorFullList.append(correctorFull)
+        
+    return correctorFullList
 
 #def computePetrovGalerkinStiffnessMatrix(NWorldCoarse,
 #                                         NCoarseElement,
