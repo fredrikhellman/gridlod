@@ -3,36 +3,49 @@ import scipy.sparse as sparse
 
 from util import *
 
+def passTwoBinaryIndices(f):
+    return lambda *ind: f(np.array(ind[:len(ind)/2], dtype='bool'),
+                          np.array(ind[len(ind)/2:], dtype='bool'))
+
 def localMassMatrix(N):
     d = np.size(N)
     detJ = np.prod(1./N)
-    M = np.zeros((2**d, 2**d))
-    for i in range(2**d):
-        for j in range(2**d):
-            delta = i^j
-            factor = 1.
-            for k in range(d):
-                factor *= 1. + (((delta>>k) & 1)^1)
-            M[i,j] = factor
-    M = detJ*M/(6.**d)
+
+    def massMatrixBinaryIndices(ib, jb):
+        return detJ*(1 << np.sum(~(ib ^ jb), axis=0))/6.**d
+
+    MBin = np.fromfunction(passTwoBinaryIndices(massMatrixBinaryIndices), shape=[2]*(2*d))
+    MFlat = MBin.flatten('F')
+    M = MFlat.reshape(2**d, 2**d, order='F')
     return M
     
 def localStiffnessMatrix(N):
     d = np.size(N)
-    A = localMassMatrix(N)
+    detJ = np.prod(1./N)
 
-    for i in range(2**d):
-        for j in range(2**d):
-            s = 0
-            for k in range(d):
-                factor = (N[k])**2
-                if ((i^j)>>k) & 1 == 0:
-                    factor *= 3
-                else:
-                    factor *= -6
-                s += factor
-            A[i,j] *= s
+    def stiffnessMatrixBinaryIndices(ib, jb):
+        M = detJ*(1 << np.sum(~(ib ^ jb), axis=0))/6.**d
+        A = M*np.sum(map(np.multiply, N**2, 3*(1-3*(ib ^ jb))), axis=0)
+        return A
+
+    ABin = np.fromfunction(passTwoBinaryIndices(stiffnessMatrixBinaryIndices), shape=[2]*(2*d))
+    AFlat = ABin.flatten('F')
+    A = AFlat.reshape(2**d, 2**d, order='F')
     return A
+
+def localBoundaryMatrix(N):
+    d = np.size(N)
+    detJd = np.prod(1./N[:-1])
+
+    def boundaryMatrixBinaryIndices(ib, jb):
+        C = detJd*(1 << np.sum(~(ib[:d-1] ^ jb[:d-1]), axis=0))/6.**(d-1)
+        C *= N[d-1]*(1-2*jb[d-1])*(1-ib[d-1])
+        return C
+
+    CBin = np.fromfunction(passTwoBinaryIndices(boundaryMatrixBinaryIndices), shape=[2]*(2*d))
+    CFlat = CBin.flatten('F')
+    C = CFlat.reshape(2**d, 2**d, order='F')
+    return C
 
 def assemblePatchMatrix(NPatch, ALoc=None, aPatch=None):
     d = np.size(NPatch)
