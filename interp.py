@@ -1,14 +1,14 @@
 import numpy as np
 import scipy.sparse as sparse
 
-from util import *
+import util
 import fem
 
 def nodalCoarseElementMatrix(NCoarseElement):
     NpFine = np.prod(NCoarseElement+1)
     NpCoarse = 2**np.size(NCoarseElement)
     
-    ind = cornerIndices(NCoarseElement)
+    ind = util.cornerIndices(NCoarseElement)
     rows = np.arange(np.size(ind))
     I = sparse.coo_matrix((np.ones_like(rows), (rows, ind)), shape=(NpCoarse, NpFine))
     return I
@@ -56,16 +56,16 @@ def assemblePatchInterpolationMatrix(IElement, NPatchFine, NCoarseElement):
     NpFine = np.prod(NPatchFine+1)
     NpCoarse = np.prod(NPatchCoarse+1)
     
-    fineToPatchMap = lowerLeftpIndexMap(NCoarseElement, NPatchFine)
-    coarseToPatchMap = lowerLeftpIndexMap(np.ones(d, dtype='int64'), NPatchCoarse)
+    fineToPatchMap = util.lowerLeftpIndexMap(NCoarseElement, NPatchFine)
+    coarseToPatchMap = util.lowerLeftpIndexMap(np.ones(d, dtype='int64'), NPatchCoarse)
     
     IElementCoo = IElement.tocoo()
 
     raisedRows = coarseToPatchMap[IElementCoo.row]
     raisedCols = fineToPatchMap[IElementCoo.col]
 
-    pCoarseInd = lowerLeftpIndexMap(NPatchCoarse-1, NPatchCoarse)
-    pFineInd = pIndexMap(NPatchCoarse-1, NPatchFine, NCoarseElement)
+    pCoarseInd = util.lowerLeftpIndexMap(NPatchCoarse-1, NPatchCoarse)
+    pFineInd = util.pIndexMap(NPatchCoarse-1, NPatchFine, NCoarseElement)
 
     fullRows = np.add.outer(pCoarseInd, raisedRows).flatten()
     fullCols = np.add.outer(pFineInd, raisedCols).flatten()
@@ -77,6 +77,6 @@ def assemblePatchInterpolationMatrix(IElement, NPatchFine, NCoarseElement):
 
 def assemblePatchNodeAveragingMatrix(iPatchCoarse, NPatchCoarse, NWorldCoarse):
     Np = np.prod(NPatchCoarse+1)
-    numNeighbors = numNeighboringElements(iPatchCoarse, NPatchCoarse, NWorldCoarse)
+    numNeighbors = util.numNeighboringElements(iPatchCoarse, NPatchCoarse, NWorldCoarse)
     return sparse.dia_matrix((1./numNeighbors, 0), shape=(Np, Np))
     

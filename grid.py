@@ -36,8 +36,8 @@ class gridPatch:
             
     def pCoarse(self):
         g = self.g
-        return pCoordinates(self.iPatchCoarse, self.NPatchCoarse, g.NWorldCoarse)
+        return pCoordinates(g.NWorldCoarse, self.iPatchCoarse, self.NPatchCoarse)
 
     def pFine(self):
         g = self.g
-        return pCoordinates(self.iPatchFine, self.NPatchFine, g.NWorldFine)
+        return pCoordinates(g.NWorldFine, self.iPatchFine, self.NPatchFine)

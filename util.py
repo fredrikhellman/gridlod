@@ -1,14 +1,28 @@
 import numpy as np
 
 def linearpIndexBasis(N):
+    """Compute basis b to convert from d-dimensional indices to linear indices.
+
+    Example for d=3:
+    
+    b = linearpIndexBasis(NWorld)
+    ind = np.dot(b, [1,2,3])
+
+    ind contains the linear index for point (1,2,3).
+    """
     cp = np.cumprod(N+1)
     b = np.hstack([[1], cp[:-1]])
     return b
 
 def interiorpIndexMap(N):
+    """Compute indices (linear order) of all interior points."""
     preIndexMap = lowerLeftpIndexMap(N-2, N)
     indexMap = np.sum(linearpIndexBasis(N))+preIndexMap
     return indexMap
+
+def boundarypIndexMap(N):
+    Np = np.prod(N+1)
+    return np.setdiff1d(np.arange(Np), interiorpIndexMap(N))
 
 def pIndexMap(NFrom, NTo, NStep):
     NTopBasis = linearpIndexBasis(NTo)
@@ -48,7 +62,11 @@ def numNeighboringElements(iPatchCoarse, NPatchCoarse, NWorldCoarse):
     numNeighboringElements = np.fromfunction(neighboringElements, shape=NPatchCoarse[::-1]+1, dtype='int64').flatten()
     return numNeighboringElements
 
-def pCoordinates(iPatch, NPatch, NWorld):
+def pCoordinates(NWorld, iPatch=None, NPatch=None):
+    if iPatch is None:
+        iPatch = np.zeros_like(NWorld, dtype='int64')
+    if NPatch is None:
+        NPatch = NWorld
     d = np.size(iPatch)
     Np = np.prod(NPatch+1)
     p = np.empty((Np,0))

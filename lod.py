@@ -27,22 +27,16 @@ def computeElementCorrectorDirichletBC(NPatchCoarse,
     NpFine = np.prod(NPatchFine+1)
 
     elementToFineIndexMap = util.lowerLeftpIndexMap(NCoarseElement, NPatchFine)
-
-    fixedIPatch = None
-    # If IPatch is nodal interpolation, then don't use Lagrange
-    # multipliers, instead remove degrees of freedom
-    if IPatch.nnz == IPatch.shape[0]:
-        IPatchCoo = IPatch.tocoo()
-        fixedIPatch = np.sort(IPatchCoo.col)
-        IPatch = None
-
+    coarseToFineIndexMap = util.fillpIndexMap(NPatchCoarse, NPatchFine)
+    
     # Find patch free degrees of freedom
     freePatch = util.interiorpIndexMap(NPatchFine)
-    if not fixedIPatch is None:
-        freePatch = np.setdiff1d(freePatch, fixedIPatch)
-
     APatchFree = APatchFull[freePatch][:,freePatch]
-        
+    coarseNodes = np.arange()
+
+    ## HALLER PA HAR
+    
+    # Compute rhs
     fineIndexBasis = util.linearpIndexBasis(NPatchFine)
     elementFineIndex = np.dot(fineIndexBasis, iElementCoarse*NCoarseElement)
     bFull = np.zeros(NpFine)
@@ -51,6 +45,10 @@ def computeElementCorrectorDirichletBC(NPatchCoarse,
         bFull[elementFineIndex + elementToFineIndexMap] = AElementFull*phi
         bFreeList.append(bFull[freePatch])
 
+    # Prepare IPatchFree
+    IPatchFree = IPatch[:,freePatch]
+    linalg.saddleNullSpace(APatchFree, IPatchFree, bFreeList)
+    
     if IPatch is None:
         correctorFreeList = []
         for bFree in bFreeList:
