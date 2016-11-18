@@ -1,4 +1,5 @@
 import numpy as np
+import copy
 
 def linearpIndexBasis(N):
     """Compute basis b to convert from d-dimensional indices to linear indices.
@@ -22,7 +23,24 @@ def interiorpIndexMap(N):
 
 def boundarypIndexMap(N):
     Np = np.prod(N+1)
+    return boundarypIndexMapLarge(N)
+
+def boundarypIndexMapSmall(N):
+    Np = np.prod(N+1)
     return np.setdiff1d(np.arange(Np), interiorpIndexMap(N))
+    
+def boundarypIndexMapLarge(N):
+    d = np.size(N)
+    b = linearpIndexBasis(N)
+    allRanges = [np.arange(Ni+1) for Ni in N]
+    allIndices = np.array([], dtype='int64')
+    for k in range(d):
+        kRange = copy.copy(allRanges)
+        kRange[k] = [0, N[k]]
+        twoSides = np.meshgrid(*kRange)
+        twoSidesIndices = reduce(np.add, map(np.multiply, b, twoSides)).flatten()
+        allIndices = np.hstack([allIndices, twoSidesIndices])
+    return np.unique(allIndices)
 
 def pIndexMap(NFrom, NTo, NStep):
     NTopBasis = linearpIndexBasis(NTo)

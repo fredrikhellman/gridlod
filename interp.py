@@ -46,6 +46,58 @@ def L2ProjectionPatchMatrix(iPatchCoarse, NPatchCoarse, NWorldCoarse, NCoarseEle
     IL2ProjectionPatch = AvgPatch*IPatch
     return IL2ProjectionPatch
 
+def uncoupledL2ProjectionCoarseElementMatrix(NCoarseElement):
+    d = np.size(NCoarseElement)
+    
+    NpFine = np.prod(NCoarseElement+1)
+
+    # First compute full element P'*M
+    MLoc = fem.localMassMatrix(NCoarseElement)
+    MElement = fem.assemblePatchMatrix(NCoarseElement, MLoc)
+    Phi = np.column_stack(fem.localBasis(NCoarseElement))
+
+    PhiTM = Phi.T*MElement
+
+    # Prepare indices to go from local to element and find all corner
+    # element indices
+    dOnes = np.ones_like(NCoarseElement, dtype='int64')
+    loc2ElementIndexMap = util.lowerLeftpIndexMap(dOnes, NCoarseElement)
+    cornerElementIndices = util.pIndexMap(dOnes, NCoarseElement, NCoarseElement-1)
+
+    # Compute P'*MCorner for all corners
+    PhiTMCornersList = []
+    for i in range(2**d):
+        cornerInd = cornerElementIndices[i] + loc2ElementIndexMap
+        PhiTMCorner = 0*PhiTM
+        PhiTMCorner[:,cornerInd] = np.dot(Phi.T[:,cornerInd], MLoc)
+        PhiTMCornersList.append(PhiTMCorner)
+
+    PhiTMAllCorners = reduce(np.add, PhiTMCornersList)
+
+    # For each corner, compute
+    #    P'*M - P'*MAllCorners + P'*MCorner
+    IDense = np.zeros((2**d, NpFine))
+    for i in range(2**d):
+        PhiTMCorner = PhiTMCornersList[i]
+        PhiTMi      = PhiTM - PhiTMAllCorners + PhiTMCorner
+        PhiTMiPhi   = np.dot(PhiTMi, Phi)
+        
+        IiDense     = np.dot(np.linalg.inv(PhiTMiPhi), PhiTMi)
+        IDense[i,:] = IiDense[i,:]
+        
+    I = sparse.coo_matrix(IDense)
+        
+    return I
+
+def uncoupledL2ProjectionPatchMatrix(iPatchCoarse, NPatchCoarse, NWorldCoarse, NCoarseElement):
+    NPatchFine = NPatchCoarse*NCoarseElement
+    
+    IElement = uncoupledL2ProjectionCoarseElementMatrix(NCoarseElement)
+    IPatch = assemblePatchInterpolationMatrix(IElement, NPatchFine, NCoarseElement)
+    AvgPatch = assemblePatchNodeAveragingMatrix(iPatchCoarse, NPatchCoarse, NWorldCoarse)
+    IuncoupledL2ProjectionPatch = AvgPatch*IPatch
+    return IuncoupledL2ProjectionPatch
+
 def assemblePatchInterpolationMatrix(IElement, NPatchFine, NCoarseElement):
     assert np.all(np.mod(NPatchFine, NCoarseElement) == 0)
 

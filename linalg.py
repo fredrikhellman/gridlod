@@ -3,6 +3,7 @@ import scipy.sparse as sparse
 import scipy.sparse.linalg
 
 import sys
+import time
 
 def saddle(A, B, rhsList):
     ''' saddle
@@ -95,7 +96,7 @@ def saddleNullSpace(A, B, rhsList, coarseNodes):
         n = A.shape[0]
         if A.shape[1] != n:
             return None
-        if np.all(A.indptr != np.arange(n)):
+        if np.all(A.indptr != np.arange(n+1)):
             return None
         if np.all(A.indices != np.arange(n)):
             return None
@@ -126,14 +127,26 @@ def saddleNullSpace(A, B, rhsList, coarseNodes):
     A21 = A12.T.tocsr()
     A21.sort_indices()
 
+    class mutable_closure:
+        timer = 0
+        counter = 0
+        
     def Ax(x):
-        return A21*(Btilde*x) + A22*x + Btildecsc.T*(A11*(Btilde*x)) + Btildecsc.T*(A12*x)
+        start = time.time()
+        y = A21*(Btilde*x) + A22*x + Btildecsc.T*(A11*(Btilde*x)) + Btildecsc.T*(A12*x)
+        end = time.time()
+        mutable_closure.timer += end-start
+        mutable_closure.counter += 1
+        return  y
 
+    ALinearOperator = sparse.linalg.LinearOperator(dtype='float64', shape=A22.shape, matvec=Ax)
+    
     correctorList = []
     for rhs in rhsList:
         print '.',
         b = rhs[notCoarseNodesMask] + Btildecsc.T*rhs[coarseNodesMask]
-        x,info = sparse.linalg.cg(Ax, b, tol=1e-9)
+        x,info = sparse.linalg.cg(ALinearOperator, b, tol=1e-9)
+        print mutable_closure.counter, mutable_closure.timer
         if info != 0:
             raise(FailedToConverge('CG failed to converge, info={}'.format(info)))
 

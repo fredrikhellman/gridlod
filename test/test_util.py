@@ -69,6 +69,16 @@ class interiorpIndexMap_TestCase(unittest.TestCase):
 
         N = np.array([2,2,3,2])
         self.assertTrue(np.all(util.interiorpIndexMap(N) == [1+3+9+36, 1+3+9+36+9]))
+
+class boundarypIndexMap_TestCase(unittest.TestCase):
+    def test_boundarypIndexMap(self):
+        N = np.array([3,4,5])
+        self.assertTrue(np.all(util.boundarypIndexMapSmall(N) ==
+                               util.boundarypIndexMapLarge(N)))
+
+        N = np.array([30,10,20])
+        self.assertTrue(np.all(util.boundarypIndexMapSmall(N) ==
+                               util.boundarypIndexMapLarge(N)))
         
 if __name__ == '__main__':
     unittest.main()
