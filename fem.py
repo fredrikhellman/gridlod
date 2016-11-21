@@ -154,4 +154,37 @@ def localBasis(N):
             newPhis0.append(np.kron(1-x, Phi))
             newPhis1.append(np.kron(x, Phi))
         Phis = newPhis0 + newPhis1
-    return Phis
+    return np.column_stack(Phis)
+
+def assembleProlongationMatrix(NPatchCoarse, NCoarseElement): #, localBasis):
+    d = np.size(NPatchCoarse)
+    Phi = localBasis(NCoarseElement)
+    assert np.size(Phi, 1) == 2**d
+
+    NPatchFine = NPatchCoarse*NCoarseElement
+    NtCoarse = np.prod(NPatchCoarse)
+    NpCoarse = np.prod(NPatchCoarse+1)
+    NpFine = np.prod(NPatchFine+1)
+
+    rowsBasis = util.lowerLeftpIndexMap(NCoarseElement, NPatchFine)
+    colsBasis = np.zeros_like(rowsBasis)
+    
+    rowsElement = np.tile(rowsBasis, 2**d)
+    colsElement = np.add.outer(util.lowerLeftpIndexMap(np.ones(d, dtype='int64'), NPatchCoarse), colsBasis).flatten()
+
+    rowsOffset = util.pIndexMap(NPatchCoarse-1, NPatchFine, NCoarseElement)
+    colsOffset = util.lowerLeftpIndexMap(NPatchCoarse-1, NPatchCoarse)
+
+    rows = np.add.outer(rowsOffset, rowsElement).flatten()
+    cols = np.add.outer(colsOffset, colsElement).flatten()
+    values = np.tile(Phi.flatten('F'), NtCoarse)
+
+    # Remove duplicates. Slow?
+    triples = dict(zip(zip(rows,cols),values))
+    rows = np.array([key[0] for key in triples.keys()])
+    cols = np.array([key[1] for key in triples.keys()])
+    values = np.array(triples.values())
+                   
+    PPatch = sparse.csc_matrix((values, (rows, cols)), shape=(NpFine, NpCoarse))
+    
+    return PPatch

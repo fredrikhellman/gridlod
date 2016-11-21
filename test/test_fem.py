@@ -272,6 +272,17 @@ class boundaryNormalDerivativeMatrixProperties_TestCase(unittest.TestCase):
 
         ones = np.ones(np.prod(NPatch+1))
         self.assertTrue(np.isclose(np.dot(ones, C*p0), 10-1))
+
+class assembleProlongationMatrix_TestCase(unittest.TestCase):
+    def test_assembleProlongationMatrixProperties(self):
+        NPatchCoarse = np.array([2,2])
+        NCoarseElement = np.array([4,4])
+
+        P = fem.assembleProlongationMatrix(NPatchCoarse, NCoarseElement)
+        self.assertTrue(np.isclose(np.linalg.norm(P.sum(axis=1)-1), 0))
+        self.assertTrue(np.isclose(P[40,4], 1))
+
+        
         
 if __name__ == '__main__':
     unittest.main()

@@ -127,7 +127,7 @@ def saddleNullSpace(A, B, rhsList, coarseNodes):
     A21 = A12.T.tocsr()
     A21.sort_indices()
 
-    class mutable_closure:
+    class mutableClosure:
         timer = 0
         counter = 0
         
@@ -135,18 +135,22 @@ def saddleNullSpace(A, B, rhsList, coarseNodes):
         start = time.time()
         y = A21*(Btilde*x) + A22*x + Btildecsc.T*(A11*(Btilde*x)) + Btildecsc.T*(A12*x)
         end = time.time()
-        mutable_closure.timer += end-start
-        mutable_closure.counter += 1
+        mutableClosure.timer += end-start
+        mutableClosure.counter += 1
         return  y
 
     ALinearOperator = sparse.linalg.LinearOperator(dtype='float64', shape=A22.shape, matvec=Ax)
     
     correctorList = []
     for rhs in rhsList:
-        print '.',
+        #print '.',
         b = rhs[notCoarseNodesMask] + Btildecsc.T*rhs[coarseNodesMask]
+
+        mutableClosure.counter = 0
+        mutableClosure.timer = 0
         x,info = sparse.linalg.cg(ALinearOperator, b, tol=1e-9)
-        print mutable_closure.counter, mutable_closure.timer
+        #print mutableClosure.counter, mutableClosure.timer
+        
         if info != 0:
             raise(FailedToConverge('CG failed to converge, info={}'.format(info)))
 

@@ -94,3 +94,20 @@ def pCoordinates(NWorld, iPatch=None, NPatch=None):
         newrow = (iPatch[k]+newrow)/NWorld[k]
         p = np.column_stack([p, newrow])
     return p
+
+def fineIndicesInPatch(NWorldCoarse, NCoarseElement, iPatchCoarse, NPatchCoarse):
+    NWorldFine = NCoarseElement*NWorldCoarse
+
+    fineIndexBasis = linearpIndexBasis(NWorldFine)
+    
+    iPatchFine = NCoarseElement*iPatchCoarse
+
+    patchFineNodeIndices = lowerLeftpIndexMap(NPatchCoarse*NCoarseElement, NWorldFine)
+    fineNodeStartIndex = np.dot(fineIndexBasis, iPatchFine)
+    fineNodeIndices = fineNodeStartIndex + patchFineNodeIndices
+
+    patchFineElementIndices = lowerLeftpIndexMap(NPatchCoarse*NCoarseElement-1, NWorldFine)
+    fineElementStartIndex = np.dot(fineIndexBasis, iPatchFine)
+    fineElementIndices = fineElementStartIndex + patchFineElementIndices
+
+    return fineNodeIndices, fineElementIndices

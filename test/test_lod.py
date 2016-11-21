@@ -6,6 +6,61 @@ import fem
 import interp
 import util
 
+class ritzProjectionToFinePatch_TestCase(unittest.TestCase):
+    def test_trivial(self):
+        NPatchCoarse = np.array([3,3])
+        NCoarseElement = np.array([2,2])
+        NPatchFine = NPatchCoarse*NCoarseElement
+        Nt = np.prod(NPatchFine)
+        Np = np.prod(NPatchFine+1)
+        fixed = util.boundarypIndexMap(NPatchFine)
+
+        aFlatPatchFine = np.ones(Nt)
+        ALoc = fem.localStiffnessMatrix(NPatchFine)
+        APatchFull = fem.assemblePatchMatrix(NPatchFine, ALoc, aFlatPatchFine)
+
+        PPatch = fem.assembleProlongationMatrix(NPatchCoarse, NCoarseElement)
+
+        IPatchNodal = interp.nodalPatchMatrix(np.array([0, 0]), NPatchCoarse, NPatchCoarse, NCoarseElement)
+        IPatchL2 = interp.uncoupledL2ProjectionPatchMatrix(np.array([0, 0]), NPatchCoarse, NPatchCoarse, NCoarseElement)
+
+        for IPatch in [IPatchNodal, IPatchL2]:
+            np.random.seed(0)
+            bPatchFullList = []
+            self.assertTrue(not lod.ritzProjectionToFinePatch(NPatchCoarse,
+                                                              NCoarseElement, APatchFull, bPatchFullList, IPatch))
+
+            bPatchFullList = [np.zeros(Np)]
+            projections = lod.ritzProjectionToFinePatch(NPatchCoarse, NCoarseElement,
+                                                        APatchFull, bPatchFullList,
+                                                        IPatch)
+            self.assertEqual(len(projections), 1)
+            self.assertTrue(np.allclose(projections[0], 0*projections[0]))
+
+            bPatchFull = np.random.rand(Np)
+            bPatchFullList = [bPatchFull]
+            projections = lod.ritzProjectionToFinePatch(NPatchCoarse, NCoarseElement,
+                                                        APatchFull, bPatchFullList,
+                                                        IPatch)
+            self.assertTrue(np.isclose(np.linalg.norm(IPatch*projections[0]), 0))
+            self.assertTrue(np.isclose(np.dot(projections[0], APatchFull*projections[0]),
+                                       np.dot(projections[0], bPatchFullList[0])))
+            self.assertTrue(np.isclose(np.linalg.norm(projections[0][fixed]), 0))
+
+            bPatchFullList = [bPatchFull, -bPatchFull]
+            projections = lod.ritzProjectionToFinePatch(NPatchCoarse, NCoarseElement,
+                                                        APatchFull, bPatchFullList,
+                                                        IPatch)
+            self.assertTrue(np.allclose(projections[0], -projections[1]))
+
+            bPatchFullList = [np.random.rand(Np), np.random.rand(Np)]
+            projections = lod.ritzProjectionToFinePatch(NPatchCoarse, NCoarseElement,
+                                                        APatchFull, bPatchFullList,
+                                                        IPatch)
+            self.assertTrue(np.isclose(np.dot(projections[1], APatchFull*projections[0]),
+                                       np.dot(projections[1], bPatchFullList[0])))
+            
+        
 class computeElementCorrectorDirichletBC_TestCase(unittest.TestCase):
     def test_trivial(self):
         return

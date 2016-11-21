@@ -28,7 +28,7 @@ def L2ProjectionCoarseElementMatrix(NCoarseElement):
     
     MLoc = fem.localMassMatrix(NCoarseElement)
     MElement = fem.assemblePatchMatrix(NCoarseElement, MLoc)
-    Phi = np.column_stack(fem.localBasis(NCoarseElement))
+    Phi = fem.localBasis(NCoarseElement)
 
     PhiTM = Phi.T*MElement
     PhiTMPhi = np.dot(PhiTM, Phi)
@@ -54,7 +54,7 @@ def uncoupledL2ProjectionCoarseElementMatrix(NCoarseElement):
     # First compute full element P'*M
     MLoc = fem.localMassMatrix(NCoarseElement)
     MElement = fem.assemblePatchMatrix(NCoarseElement, MLoc)
-    Phi = np.column_stack(fem.localBasis(NCoarseElement))
+    Phi = fem.localBasis(NCoarseElement)
 
     PhiTM = Phi.T*MElement
 

@@ -15,6 +15,39 @@ import linalg
 #    APatchFull = fem.assemblePatchMatrix(NPatchFine, ALoc, aFlatPatchFine)
 #    pass
 
+def ritzProjectionToFinePatch(NPatchCoarse,
+                              NCoarseElement,
+                              APatchFull,
+                              bPatchFullList,
+                              IPatch):
+    d = np.size(NPatchCoarse)
+    NPatchFine = NPatchCoarse*NCoarseElement
+    NpFine = np.prod(NPatchFine+1)
+
+    fixed = util.boundarypIndexMap(NPatchFine)
+    def imposeBoundaryConditionsStronglyOnMatrix(A, fixed):
+        AStrong = A.copy()
+        nzFixedCols = AStrong[:,fixed].nonzero()
+        AStrong[nzFixedCols[0],fixed[nzFixedCols[1]]] = 0
+        nzFixedRows = AStrong[fixed,:].nonzero()
+        AStrong[fixed[nzFixedRows[0]],nzFixedRows[1]] = 0
+        AStrong[fixed,fixed] = 1
+        return AStrong
+
+    def imposeBoundaryConditionsStronglyOnVector(b, fixed):
+        bStrong = b.copy()
+        bStrong[fixed] = 0
+        return bStrong
+
+    APatch = imposeBoundaryConditionsStronglyOnMatrix(APatchFull, fixed)
+    bPatchList = [imposeBoundaryConditionsStronglyOnVector(bPatchFull, fixed) for bPatchFull in bPatchFullList]
+
+    coarseNodes = util.fillpIndexMap(NPatchCoarse, NPatchFine)
+
+    projectionsList = linalg.saddleNullSpace(APatch, IPatch, bPatchList, coarseNodes)
+
+    return projectionsList
+
 def computeElementCorrectorDirichletBC(NPatchCoarse,
                                        NCoarseElement,
                                        iElementCoarse,
@@ -22,17 +55,6 @@ def computeElementCorrectorDirichletBC(NPatchCoarse,
                                        AElementFull,
                                        localBasis,
                                        IPatch):
-    d = np.size(NPatchCoarse)
-    NPatchFine = NPatchCoarse*NCoarseElement
-    NpFine = np.prod(NPatchFine+1)
-
-    elementToFineIndexMap = util.lowerLeftpIndexMap(NCoarseElement, NPatchFine)
-    coarseToFineIndexMap = util.fillpIndexMap(NPatchCoarse, NPatchFine)
-    
-    # Find patch free degrees of freedom
-    freePatch = util.interiorpIndexMap(NPatchFine)
-    APatchFree = APatchFull[freePatch][:,freePatch]
-    coarseNodes = np.arange()
 
     ## HALLER PA HAR
     
