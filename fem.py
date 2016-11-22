@@ -186,5 +186,6 @@ def assembleProlongationMatrix(NPatchCoarse, NCoarseElement): #, localBasis):
     values = np.array(triples.values())
                    
     PPatch = sparse.csc_matrix((values, (rows, cols)), shape=(NpFine, NpCoarse))
+    PPatch.eliminate_zeros()
     
     return PPatch

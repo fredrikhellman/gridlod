@@ -44,8 +44,12 @@ def ritzProjectionToFinePatch(NPatchCoarse,
 
     coarseNodes = util.fillpIndexMap(NPatchCoarse, NPatchFine)
 
-    projectionsList = linalg.saddleNullSpace(APatch, IPatch, bPatchList, coarseNodes)
-
+    #projectionsList = linalg.saddleNullSpace(APatch, IPatch, bPatchList, coarseNodes)
+    PPatch = fem.assembleProlongationMatrix(NPatchCoarse, NCoarseElement)
+    projectionsList = linalg.saddleNullSpaceHierarchicalBasis(APatch, IPatch, PPatch, bPatchList, coarseNodes)
+    
+    #projectionsList = linalg.solveWithBlockDiagonalPreconditioner(APatch, IPatch, bPatchList)
+    #projectionsList = linalg.schurComplementSolve(APatch, IPatch, bPatchList)
     return projectionsList
 
 def computeElementCorrectorDirichletBC(NPatchCoarse,

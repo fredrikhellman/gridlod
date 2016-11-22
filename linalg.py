@@ -52,6 +52,80 @@ def saddle(A, B, rhsList):
 class FailedToConverge(Exception):
     pass
 
+def saddleNullSpaceHierarchicalBasis(A, B, P, rhsList, coarseNodes):
+    '''Solve ( S'*A*S  S'*B' ) ( y  )   ( S'b )
+             (    B*S  0     ) ( mu ) = ( 0   )
+
+    and compute x = S*y where
+
+        ( |  0 )
+    S = ( P    ) 
+        ( |  I )
+
+    if the nodes are reordered so that coarseNodes comes first.
+    '''
+    Np = A.shape[0]
+    Nc = np.size(coarseNodes)
+
+    coarseNodesMask = np.zeros(Np, dtype='bool')
+    coarseNodesMask[coarseNodes] = True
+    notCoarseNodesMask = np.logical_not(coarseNodesMask)
+    notCoarseNodes = np.where(notCoarseNodesMask)[0]
+    nodePermutation = np.hstack([coarseNodes, notCoarseNodes])
+    
+    PSub = P[notCoarseNodes,:]
+    I1 = sparse.identity(Nc, format='csc')
+    I2 = sparse.identity(Np-Nc, format='csc')
+    S = sparse.bmat([[I1,   None],
+                     [PSub, I2]], format='csc')
+
+    Bn = B[:,notCoarseNodesMask]
+    Z = sparse.bmat([[-Bn],
+                     [I2]], format='csc')
+
+    APerm = A[nodePermutation][:,nodePermutation]
+    #Z = sparse.coo_matrix((Np,Np-Nc))
+    #Z[notCoarseNodesMask,:] = sparse.identity(Np-Nc, format='coo')
+    #Z[coarseNodesMask,:] = -B[:,notCoarseNodesMask]
+    #Z = Z.tocsc()
+    
+    class mutableClosure:
+        timer = 0
+        counter = 0
+        
+    def Ax(x):
+        start = time.time()
+        y = Z.T*(S.T*(APerm*(S*(Z*x))))
+        end = time.time()
+        mutableClosure.timer += end-start
+        mutableClosure.counter += 1
+        return  y
+
+    ALinearOperator = sparse.linalg.LinearOperator(dtype='float64', shape=(Np-Nc, Np-Nc), matvec=Ax)
+    
+    correctorList = []
+    for rhs in rhsList:
+        #print '.',
+        b = Z.T*(S.T*rhs[nodePermutation])
+
+        mutableClosure.counter = 0
+        mutableClosure.timer = 0
+        xPerm,info = sparse.linalg.cg(ALinearOperator, b, tol=1e-9)
+        print mutableClosure.counter, mutableClosure.timer
+        
+        if info != 0:
+            raise(FailedToConverge('CG failed to converge, info={}'.format(info)))
+
+        totalDofs = A.shape[0]
+        corrector = np.zeros(Np)
+        corrector[nodePermutation] = S*(Z*xPerm)
+        correctorList.append(corrector)
+        
+    return correctorList
+    
+    # We have that (B*S)[coarseNodes,coarseNodes] is identity.  A
+    # "nice basis" is found for all projections.
+    
 def saddleNullSpace(A, B, rhsList, coarseNodes):
     '''lodSaddle
 
@@ -149,7 +223,7 @@ def saddleNullSpace(A, B, rhsList, coarseNodes):
         mutableClosure.counter = 0
         mutableClosure.timer = 0
         x,info = sparse.linalg.cg(ALinearOperator, b, tol=1e-9)
-        #print mutableClosure.counter, mutableClosure.timer
+        print mutableClosure.counter, mutableClosure.timer
         
         if info != 0:
             raise(FailedToConverge('CG failed to converge, info={}'.format(info)))
@@ -161,3 +235,91 @@ def saddleNullSpace(A, B, rhsList, coarseNodes):
         correctorList.append(corrector)
         
     return correctorList
+
+
+from scikits.sparse.cholmod import cholesky
+            
+def solveWithBlockDiagonalPreconditioner(A, B, bList):
+    """Solve saddle point problem with block diagonal preconditioner
+
+    / A  B.T \   / r \   / b \
+    |        | * |   | = |   |
+    \ B   0  /   \ s /   \ 0 /
+
+    Section 10.1.1 in "Numerical solution of saddle point problems",
+    Benzi, Golub and Liesen.
+    """
+
+    n = np.size(A,0)
+    m = np.size(B,0)
+
+    cholA = cholesky(A)
+    S = np.zeros((B.shape[0], B.shape[0]))
+    for s, Brow in zip(S.T, B):
+        y = cholA.solve_A(np.array(Brow.todense()).T.squeeze())
+        s[:] = -B*y
+        
+    SInv = np.linalg.inv(S)
+
+    def solveP(x):
+        r = x[:n]
+        s = x[-m:]
+        rSol = cholA.solve_A(r)
+        sSol = -np.dot(SInv, s)
+        return np.hstack([rSol, sSol])
+
+    M = sparse.linalg.LinearOperator((n+m,n+m), solveP)
+
+    K = sparse.bmat([[A, B.T],
+                     [B, None]], format='csc');
+    c = np.zeros(n+m)
+
+    numIter = [0]
+    def cgCallback(x):
+        numIter[0] +=  1
+
+    rList = []
+    xList = []
+    infoList = []
+    numIterList = []
+    for b in bList:
+        numIter = [0]
+        c[:n] = b
+        x, info = sparse.linalg.cg(K, c, tol=1e-9, M=M, callback=cgCallback)
+        r = x[:n]
+        rList.append(r)
+        xList.append(x)
+        infoList.append(info)
+        numIterList.append(numIter[0])
+
+    return rList
+
+def schurComplementSolve(A, B, bList):
+    correctorFreeList = []
+
+    # Pre-processing (page 12, Engwer, Henning, Malqvist)
+    # Rename for brevity
+            
+    # Compute Y
+    #luA = sparse.linalg.splu(A)
+    #luA_approxpprox = sparse.linalg.spilu(A)
+    cholA = cholesky(A)
+    Y = np.zeros((B.shape[1], B.shape[0]))
+    for y, c in zip(Y.T, B):
+        #y[:] = luA.solve(np.array(c.todense()).T.squeeze())
+        #y[:] = luA_approx.solve(np.array(c.todense()).T.squeeze())
+        y[:] = cholA.solve_A(np.array(c.todense()).T.squeeze())
+                
+    S = B*Y
+    invS = np.linalg.inv(S)
+
+    # Post-processing
+    for b in bList:
+        r = b
+        #q = luA.solve(r)
+        #q = luA_approx.solve(r)
+        q = cholA.solve_A(r)
+        lam = np.dot(invS, B*q)
+        correctorFree = q - np.dot(Y,lam)
+        correctorFreeList.append(correctorFree)
+    return correctorFreeList

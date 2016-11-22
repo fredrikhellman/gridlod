@@ -98,16 +98,17 @@ def pCoordinates(NWorld, iPatch=None, NPatch=None):
 def fineIndicesInPatch(NWorldCoarse, NCoarseElement, iPatchCoarse, NPatchCoarse):
     NWorldFine = NCoarseElement*NWorldCoarse
 
-    fineIndexBasis = linearpIndexBasis(NWorldFine)
+    fineNodeIndexBasis = linearpIndexBasis(NWorldFine)
+    fineElementIndexBasis = linearpIndexBasis(NWorldFine-1)
     
     iPatchFine = NCoarseElement*iPatchCoarse
 
     patchFineNodeIndices = lowerLeftpIndexMap(NPatchCoarse*NCoarseElement, NWorldFine)
-    fineNodeStartIndex = np.dot(fineIndexBasis, iPatchFine)
+    fineNodeStartIndex = np.dot(fineNodeIndexBasis, iPatchFine)
     fineNodeIndices = fineNodeStartIndex + patchFineNodeIndices
 
-    patchFineElementIndices = lowerLeftpIndexMap(NPatchCoarse*NCoarseElement-1, NWorldFine)
-    fineElementStartIndex = np.dot(fineIndexBasis, iPatchFine)
+    patchFineElementIndices = lowerLeftpIndexMap(NPatchCoarse*NCoarseElement-1, NWorldFine-1)
+    fineElementStartIndex = np.dot(fineElementIndexBasis, iPatchFine)
     fineElementIndices = fineElementStartIndex + patchFineElementIndices
 
     return fineNodeIndices, fineElementIndices
