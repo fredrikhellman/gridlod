@@ -98,9 +98,10 @@ class corrector_TestCase(unittest.TestCase):
         NWorldCoarse = np.array([4, 5, 6])
         NCoarseElement = np.array([5, 2, 3])
         world = World(NWorldCoarse, NCoarseElement)
-
+        d = np.size(NWorldCoarse)
+        
         k = 1
-        iElementWorldCoarse = np.array([1, 2, 0])
+        iElementWorldCoarse = np.array([2, 1, 2])
         ec = lod.ElementCorrector(world, k, iElementWorldCoarse)
         IPatch = interp.nodalPatchMatrix(ec.iPatchWorldCoarse, ec.NPatchCoarse, NWorldCoarse, NCoarseElement)
 
@@ -112,12 +113,23 @@ class corrector_TestCase(unittest.TestCase):
         self.assertTrue(np.allclose(correctorSum, 0))
 
         ec.computeCoarseQuantities()
+        # Test that the matrices have the constants in their null space
         self.assertTrue(np.allclose(np.sum(ec.csi.LTPrimeij, axis=1), 0))
         self.assertTrue(np.allclose(np.sum(ec.csi.LTPrimeij, axis=2), 0))
 
         self.assertTrue(np.allclose(np.sum(ec.csi.Kij, axis=0), 0))
         self.assertTrue(np.allclose(np.sum(ec.csi.Kij, axis=1), 0))
 
+        # I had difficulties come up with test cases here. This test
+        # verifies that most "energy" is in the element T.
+        patchElementIndexBasis = util.linearpIndexBasis(ec.NPatchCoarse-1)
+        elementTIndex = np.dot(patchElementIndexBasis, ec.iElementPatchCoarse)
+        v = np.zeros(2**d)
+        v[0] = 1
+        intensity = np.dot(np.dot(ec.csi.LTPrimeij, v), v)
+        self.assertTrue(np.all(intensity[elementTIndex] >= intensity))
+        self.assertTrue(not np.all(intensity[elementTIndex+1] >= intensity))
+        
         ec.clearFineQuantities()
 if __name__ == '__main__':
     unittest.main()
