@@ -80,5 +80,20 @@ class boundarypIndexMap_TestCase(unittest.TestCase):
         self.assertTrue(np.all(util.boundarypIndexMapSmall(N) ==
                                util.boundarypIndexMapLarge(N)))
         
+class extractPatchFine_TestCase(unittest.TestCase):
+    def test_extractPatchFine(self):
+        NCoarse = np.array([10])
+        NCoarseElement = np.array([3])
+        iPatchCoarse = np.array([2])
+        NPatchCoarse = np.array([3])
+        
+        patchFineIndexMap = util.extractPatchFine(NCoarse, NCoarseElement, iPatchCoarse, NPatchCoarse,
+                                                  extractElements=True)
+        self.assertTrue(np.all(patchFineIndexMap == 6+np.arange(9)))
+
+        patchFineIndexMap = util.extractPatchFine(NCoarse, NCoarseElement, iPatchCoarse, NPatchCoarse,
+                                                  extractElements=False)
+        self.assertTrue(np.all(patchFineIndexMap == 6+np.arange(10)))
+        
 if __name__ == '__main__':
     unittest.main()

@@ -42,6 +42,26 @@ def boundarypIndexMapLarge(N):
         allIndices = np.hstack([allIndices, twoSidesIndices])
     return np.unique(allIndices)
 
+def extractElementFine(NCoarse,
+                       NCoarseElement,
+                       iElementCoarse,
+                       extractElements=True):
+    return extractPatchFine(NCoarse, NCoarseElement, iElementCoarse, 0*iElementCoarse+1, extractElements)
+
+def extractPatchFine(NCoarse,
+                     NCoarseElement,
+                     iPatchCoarse,
+                     NPatchCoarse,
+                     extractElements=True):
+    NFine = NCoarse*NCoarseElement
+    fineIndexBasis = linearpIndexBasis(NFine)
+    patchFineIndexStart = np.dot(fineIndexBasis, iPatchCoarse*NCoarseElement)
+    if extractElements:
+        patchFineIndexMap = lowerLeftpIndexMap(NPatchCoarse*NCoarseElement-1, NFine)
+    else:
+        patchFineIndexMap = lowerLeftpIndexMap(NPatchCoarse*NCoarseElement, NFine)
+    return patchFineIndexStart + patchFineIndexMap
+
 def pIndexMap(NFrom, NTo, NStep):
     NTopBasis = linearpIndexBasis(NTo)
     NTopBasis = NStep*NTopBasis
@@ -112,3 +132,20 @@ def fineIndicesInPatch(NWorldCoarse, NCoarseElement, iPatchCoarse, NPatchCoarse)
     fineElementIndices = fineElementStartIndex + patchFineElementIndices
 
     return fineNodeIndices, fineElementIndices
+
+def ignoreDuplicates(row, col, data):
+    # Assumes (data, row, col) not in canonical format.
+    if len(data) == 0:
+        return row, col, data
+    order = np.lexsort((row, col))
+    row = row[order]
+    col = col[order]
+    data = data[order]
+    unique_mask = ((row[1:] != row[:-1]) |
+                   (col[1:] != col[:-1]))
+    unique_mask = np.append(True, unique_mask)
+    row = row[unique_mask]
+    col = col[unique_mask]
+    data = data[unique_mask]
+    return row, col, data
+

@@ -93,6 +93,7 @@ def assemblePatchMatrix(NPatch, ALoc, aPatch=None):
     values = np.kron(aPatch, ALoc.flatten())
 
     APatch = sparse.csc_matrix((values, (rows, cols)), shape=(Np, Np))
+    APatch.eliminate_zeros()
     
     return APatch
 
@@ -139,6 +140,7 @@ def assemblePatchBoundaryMatrix(NPatch, CLocGetter, aPatch=None):
 
 
     APatch = sparse.csc_matrix((values, (rows, cols)), shape=(Np, Np))
+    APatch.eliminate_zeros()
     
     return APatch
 
@@ -179,13 +181,53 @@ def assembleProlongationMatrix(NPatchCoarse, NCoarseElement): #, localBasis):
     cols = np.add.outer(colsOffset, colsElement).flatten()
     values = np.tile(Phi.flatten('F'), NtCoarse)
 
-    # Remove duplicates. Slow?
-    triples = dict(zip(zip(rows,cols),values))
-    rows = np.array([key[0] for key in triples.keys()])
-    cols = np.array([key[1] for key in triples.keys()])
-    values = np.array(triples.values())
-                   
+    rows, cols, values = util.ignoreDuplicates(rows, cols, values)
     PPatch = sparse.csc_matrix((values, (rows, cols)), shape=(NpFine, NpCoarse))
     PPatch.eliminate_zeros()
     
     return PPatch
+
+def assembleHierarchicalBasisMatrix(NPatchCoarse, NCoarseElement):
+    NPatchFine = NPatchCoarse*NCoarseElement
+    NpFine = np.prod(NPatchFine+1)
+
+    # Use simplest possible hierarchy, divide by two in all dimensions
+    NLevelElement = NCoarseElement.copy()
+    while np.all(np.mod(NLevelElement, 2) == 0):
+        NLevelElement /= 2
+
+    assert np.all(NLevelElement == 1)
+        
+    rowsList = []
+    colsList = []
+    valuesList = []
+
+    # Loop over levels
+    while np.all(NLevelElement <= NCoarseElement):
+        # Compute level basis functions on fine mesh
+        NCoarseLevel = NCoarseElement/NLevelElement
+        NPatchLevel = NPatchCoarse*NCoarseLevel
+        PLevel = assembleProlongationMatrix(NPatchLevel, NLevelElement)
+        PLevel = PLevel.tocoo()
+        
+        # Rows are ok. Columns must be sparsened to fine mesh.
+        colsMap = util.pIndexMap(NPatchLevel, NPatchFine, NLevelElement)
+        rowsList.append(PLevel.row)
+        colsList.append(colsMap[PLevel.col])
+        valuesList.append(PLevel.data)
+        
+        NLevelElement = 2*NLevelElement
+
+    # Concatenate lists (backwards so that we can ignore duplicates)
+    rows = np.hstack(rowsList[::-1])
+    cols = np.hstack(colsList[::-1])
+    values = np.hstack(valuesList[::-1])
+
+    # Ignore duplicates
+    rows, cols, values = util.ignoreDuplicates(rows, cols, values)
+
+    # Create sparse matrix
+    PHier = sparse.csc_matrix((values, (rows, cols)), shape=(NpFine, NpFine))
+    PHier.eliminate_zeros()
+
+    return PHier

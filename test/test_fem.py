@@ -282,7 +282,24 @@ class assembleProlongationMatrix_TestCase(unittest.TestCase):
         self.assertTrue(np.isclose(np.linalg.norm(P.sum(axis=1)-1), 0))
         self.assertTrue(np.isclose(P[40,4], 1))
 
+class assembleHierarchicalBasisMatrix_TestCase(unittest.TestCase):
+    def test_assembleHierarchicalBasisProperties(self):
+        NPatchCoarse = np.array([1])
+        NCoarseElement = np.array([4])
+
+        PHier = fem.assembleHierarchicalBasisMatrix(NPatchCoarse, NCoarseElement)
+        self.assertTrue(np.allclose(PHier.A, np.array([[1,    0, 0,   0, 0   ],
+                                                       [0.75, 1, 0.5, 0, 0.25],
+                                                       [0.5,  0, 1,   0, 0.5 ],
+                                                       [0.25, 0, 0.5, 1, 0.75],
+                                                       [0.0,  0, 0,   0, 1   ]])))
         
+        NPatchCoarse = np.array([1,1])
+        NCoarseElement = np.array([4,4])
+        NPatchFine = NPatchCoarse*NCoarseElement
+        
+        PHier = fem.assembleHierarchicalBasisMatrix(NPatchCoarse, NCoarseElement)
+        self.assertTrue(np.allclose(PHier.diagonal(), 0*PHier.diagonal()+1))
         
 if __name__ == '__main__':
     unittest.main()

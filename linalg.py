@@ -52,6 +52,82 @@ def saddle(A, B, rhsList):
 class FailedToConverge(Exception):
     pass
 
+def saddleNullSpaceGeneralBasis(A, B, S, rhsList, coarseNodes):
+    Np = A.shape[0]
+    Nc = np.size(coarseNodes)
+
+    coarseNodesMask = np.zeros(Np, dtype='bool')
+    coarseNodesMask[coarseNodes] = True
+    notCoarseNodesMask = np.logical_not(coarseNodesMask)
+    notCoarseNodes = np.where(notCoarseNodesMask)[0]
+    nodePermutation = np.hstack([coarseNodes, notCoarseNodes])
+
+    Sc   = S[:,coarseNodesMask]
+    PSub = Sc[notCoarseNodesMask,:]
+    Snc  = S[:,notCoarseNodesMask]
+    SPerm = sparse.bmat([[Sc, Snc]], format='csc')
+
+    I = sparse.identity(Np-Nc, format='csc')
+    Bn = B*Snc
+
+    Z = sparse.bmat([[-Bn],
+                     [I]], format='csc')
+
+    Zcsr = Z.tocsr()
+    SPermcsr = SPerm.tocsr()
+    Acsr = A.tocsr()
+
+    class mutableClosure:
+        Atimer = 0
+        Mtimer = 0
+        counter = 0
+        
+    def Ax(x):
+        start = time.time()
+        y = Z.T*(SPerm.T*(Acsr*(SPermcsr*(Zcsr*x))))
+        end = time.time()
+        mutableClosure.Atimer += end-start
+        mutableClosure.counter += 1
+        return  y
+
+    # Does not work...
+    def MInvx(x):
+        start = time.time()
+        y = PSub*(PSub.T*x) + x
+        end = time.time()
+        mutableClosure.Mtimer += end-start
+        return  y
+
+    ALinearOperator = sparse.linalg.LinearOperator(dtype='float64', shape=(Np-Nc, Np-Nc), matvec=Ax)
+    MInvLinearOperator = sparse.linalg.LinearOperator(dtype='float64', shape=(Np-Nc, Np-Nc), matvec=MInvx)
+    
+    correctorList = []
+    for rhs in rhsList:
+        b = Z.T*(SPerm.T*rhs)
+
+        def cgCallback(xk):
+            print np.linalg.norm(Z.T*(SPerm.T*(A*(SPerm*(Z*xk))))-b)
+            return
+        
+        mutableClosure.counter = 0
+        mutableClosure.Atimer = 0
+        mutableClosure.Mtimer = 0
+        start = time.time()
+        xPerm,info = sparse.linalg.cg(ALinearOperator, b, callback=None, tol=1e-9, M=None)
+        #print mutableClosure.counter, mutableClosure.Atimer, mutableClosure.Mtimer
+        end = time.time()
+        #print end-start
+        
+        if info != 0:
+            raise(FailedToConverge('CG failed to converge, info={}'.format(info)))
+
+        totalDofs = A.shape[0]
+        corrector = np.zeros(Np)
+        corrector = SPerm*(Z*xPerm)
+        correctorList.append(corrector)
+        
+    return correctorList
+
 def saddleNullSpaceHierarchicalBasis(A, B, P, rhsList, coarseNodes):
     '''Solve ( S'*A*S  S'*B' ) ( y  )   ( S'b )
              (    B*S  0     ) ( mu ) = ( 0   )
@@ -76,43 +152,55 @@ def saddleNullSpaceHierarchicalBasis(A, B, P, rhsList, coarseNodes):
     PSub = P[notCoarseNodes,:]
     I1 = sparse.identity(Nc, format='csc')
     I2 = sparse.identity(Np-Nc, format='csc')
+    Bn = B[:,notCoarseNodesMask]
+
     S = sparse.bmat([[I1,   None],
                      [PSub, I2]], format='csc')
-
-    Bn = B[:,notCoarseNodesMask]
     Z = sparse.bmat([[-Bn],
                      [I2]], format='csc')
 
     APerm = A[nodePermutation][:,nodePermutation]
-    #Z = sparse.coo_matrix((Np,Np-Nc))
-    #Z[notCoarseNodesMask,:] = sparse.identity(Np-Nc, format='coo')
-    #Z[coarseNodesMask,:] = -B[:,notCoarseNodesMask]
-    #Z = Z.tocsc()
     
     class mutableClosure:
-        timer = 0
+        Atimer = 0
+        Mtimer = 0
         counter = 0
         
     def Ax(x):
         start = time.time()
         y = Z.T*(S.T*(APerm*(S*(Z*x))))
         end = time.time()
-        mutableClosure.timer += end-start
+        mutableClosure.Atimer += end-start
         mutableClosure.counter += 1
         return  y
 
+    def MInvx(x):
+        start = time.time()
+        y = PSub*(PSub.T*x) + x
+        end = time.time()
+        mutableClosure.Mtimer += end-start
+        return  y
+    
     ALinearOperator = sparse.linalg.LinearOperator(dtype='float64', shape=(Np-Nc, Np-Nc), matvec=Ax)
+    MInvLinearOperator = sparse.linalg.LinearOperator(dtype='float64', shape=(Np-Nc, Np-Nc), matvec=MInvx)
     
     correctorList = []
     for rhs in rhsList:
         #print '.',
         b = Z.T*(S.T*rhs[nodePermutation])
 
-        mutableClosure.counter = 0
-        mutableClosure.timer = 0
-        xPerm,info = sparse.linalg.cg(ALinearOperator, b, tol=1e-9)
-        print mutableClosure.counter, mutableClosure.timer
+        def cgCallback(xk):
+            print np.linalg.norm(Z.T*(S.T*(APerm*(S*(Z*xk))))-b)
+            return
         
+        mutableClosure.counter = 0
+        mutableClosure.Atimer = 0
+        mutableClosure.Mtimer = 0
+        start = time.time()
+        xPerm,info = sparse.linalg.cg(ALinearOperator, b, callback=None, tol=1e-9, M=MInvLinearOperator)
+        #print mutableClosure.counter, mutableClosure.Atimer, mutableClosure.Mtimer
+        end = time.time()
+        #print end-start
         if info != 0:
             raise(FailedToConverge('CG failed to converge, info={}'.format(info)))
 
