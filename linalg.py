@@ -73,10 +73,9 @@ def saddleNullSpaceGeneralBasis(A, B, S, rhsList, coarseNodes):
     Z = sparse.bmat([[-Bn],
                      [I]], format='csc')
 
-    Zcsr = Z.tocsr()
-    SPermcsr = SPerm.tocsr()
-    Acsr = A.tocsr()
-
+    ZT = Z.T
+    SPermT = SPerm.T
+   
     class mutableClosure:
         Atimer = 0
         Mtimer = 0
@@ -84,7 +83,7 @@ def saddleNullSpaceGeneralBasis(A, B, S, rhsList, coarseNodes):
         
     def Ax(x):
         start = time.time()
-        y = Z.T*(SPerm.T*(Acsr*(SPermcsr*(Zcsr*x))))
+        y = ZT*(SPermT*(A*(SPerm*(Z*x))))
         end = time.time()
         mutableClosure.Atimer += end-start
         mutableClosure.counter += 1
@@ -159,6 +158,9 @@ def saddleNullSpaceHierarchicalBasis(A, B, P, rhsList, coarseNodes):
     Z = sparse.bmat([[-Bn],
                      [I2]], format='csc')
 
+    ST = S.T
+    ZT = Z.T
+    PSubT = PSub.T
     APerm = A[nodePermutation][:,nodePermutation]
     
     class mutableClosure:
@@ -168,7 +170,7 @@ def saddleNullSpaceHierarchicalBasis(A, B, P, rhsList, coarseNodes):
         
     def Ax(x):
         start = time.time()
-        y = Z.T*(S.T*(APerm*(S*(Z*x))))
+        y = ZT*(ST*(APerm*(S*(Z*x))))
         end = time.time()
         mutableClosure.Atimer += end-start
         mutableClosure.counter += 1
@@ -176,7 +178,7 @@ def saddleNullSpaceHierarchicalBasis(A, B, P, rhsList, coarseNodes):
 
     def MInvx(x):
         start = time.time()
-        y = PSub*(PSub.T*x) + x
+        y = PSub*(PSubT*x) + x
         end = time.time()
         mutableClosure.Mtimer += end-start
         return  y
@@ -187,10 +189,10 @@ def saddleNullSpaceHierarchicalBasis(A, B, P, rhsList, coarseNodes):
     correctorList = []
     for rhs in rhsList:
         #print '.',
-        b = Z.T*(S.T*rhs[nodePermutation])
+        b = ZT*(ST*rhs[nodePermutation])
 
         def cgCallback(xk):
-            print np.linalg.norm(Z.T*(S.T*(APerm*(S*(Z*xk))))-b)
+            print np.linalg.norm(ZT*(ST*(APerm*(S*(Z*xk))))-b)
             return
         
         mutableClosure.counter = 0
