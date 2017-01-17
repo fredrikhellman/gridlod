@@ -126,9 +126,10 @@ class ElementCorrector:
             self.correctorsList = correctorsList
 
     class CoarseScaleInformation:
-        def __init__(self, Kij, LTPrimeij, relA=None):
+        def __init__(self, Kij, muTPrime, relA=None):
             self.Kij = Kij
-            self.LTPrimeij = LTPrimeij
+            #self.LTPrimeij = LTPrimeij
+            self.muTPrime = muTPrime
             self.relA = relA
 
     @property
@@ -198,11 +199,15 @@ class ElementCorrector:
 
         Compute the tensors (T is given by the class instance):
 
-        KTij   = (A \nabla (lambda_j - Q-T lambda_j), \nabla lambda_i)_{U_k(T)}
-        LTT'ij = (A \nabla (chi_T - Q_T)lambda_j, \nabla (chi_T - Q_T) lambda_j)_{T'}
+        KTij   = (A \nabla (lambda_j - Q_T lambda_j), \nabla lambda_i)_{U_k(T)}
+        muTT'  = max_{w_H} || A \nabla (\chi_T - Q_T) w_H ||^2_T' / || A \nabla w_H ||^2_T
 
         and store them in the self.csi object. See
-        notes/coarse_quantities.pdf for a description.
+        notes/coarse_quantities*.pdf for a description.
+
+        Auxiliary quantities are computed, but not saved, e.g.
+
+        LTT'ij = (A \nabla (chi_T - Q_T)lambda_j, \nabla (chi_T - Q_T) lambda_j)_{T'}
 
         The argument relAPatch is for providing a coarse (patch)
         element relative coefficient factor, i.e. if aPatch is
@@ -211,7 +216,7 @@ class ElementCorrector:
            aPatch|_T = baseA|_T*relAPatch|_T   (note relAPatch|_T is constant)
 
         If relAPatch is provided, relAPatch will be stored and can be used for
-        efficiently computing deltaTPrime.
+        computing error indicators.
         '''
         assert(hasattr(self, 'fsi'))
 
@@ -273,67 +278,38 @@ class ElementCorrector:
                 LTPrimeij[TPrimeInd] = CTPrimeij
                 Kij[sigma,:] += -BTPrimeij
 
+        muTPrime = np.zeros(NTPrime)
+        for TPrimeInd in np.arange(NTPrime):
+            # Solve eigenvalue problem LTPrimeij x = mu_TPrime Mij x
+            eigenvalues = scipy.linalg.eigvals(LTPrimeij[TPrimeInd][:-1,:-1], Aij[:-1,:-1])
+            muTPrime[TPrimeInd] = np.max(np.real(eigenvalues))
 
-        self.csi = self.CoarseScaleInformation(Kij, LTPrimeij, relAPatch)
+        self.csi = self.CoarseScaleInformation(Kij, muTPrime, relAPatch)
 
     def clearFineQuantities(self):
         assert(hasattr(self, 'fsi'))
         del self.fsi
 
-    def computeErrorIndicator(self, aNewPatch, relANewPatch=None):
+    def computeErrorIndicator(self, relANewPatch):
         assert(hasattr(self, 'csi'))
+        assert(hasattr(self.csi, 'relA'))
         
         world = self.world
         NPatchCoarse = self.NPatchCoarse
         NCoarseElement = world.NCoarseElement
         iElementPatchCoarse = self.iElementPatchCoarse
-        NPatchFine = NCoarseElement*NPatchCoarse
 
-        # Sanity checks
-        assert(relANewPatch is not None or hasattr(self, 'fsi'))
-        assert(relANewPatch is None or self.csi.relA is not None)
-
-        ALoc = world.ALoc
-        localBasis = world.localBasis
-        
-        elementFinetIndexMap = util.extractElementFine(NPatchCoarse,
-                                                       NCoarseElement,
-                                                       iElementPatchCoarse,
-                                                       extractElements=True)
-        
-        AElement = fem.assemblePatchMatrix(NCoarseElement, ALoc, self.fsi.aPatch[elementFinetIndexMap])
-        Mij = np.dot(localBasis.T, AElement*localBasis)
-        LTPrimeij = self.csi.LTPrimeij
+        linearCoarsetBasis = util.linearpIndexBasis(NPatchCoarse-1)
+        elementCoarseIndex = np.dot(linearCoarsetBasis, iElementPatchCoarse)
         
         relA = self.csi.relA
-        
-        NTPrime = np.prod(NPatchCoarse)
+        muTPrime = self.csi.muTPrime
+        deltaMaxNormTPrime = np.abs((relANewPatch - relA)/np.sqrt(relANewPatch*relA))
 
-        if relANewPatch is not None:
-            deltaMaxNormTPrime = np.abs((relaANewPatch - relA)/np.sqrt(relaANewPatch*relaA))
-        else:
-            deltaMaxNormTPrime = np.zeros(NTPrime)
-            TPrimeFinetStartIndices = util.pIndexMap(NPatchCoarse-1, NPatchFine-1, NCoarseElement)
-            TPrimeFinetIndexMap = util.lowerLeftpIndexMap(NCoarseElement-1, NPatchFine-1)
+        epsilonTSquare = relANewPatch[elementCoarseIndex]/relA[elementCoarseIndex] * \
+                         np.sum((deltaMaxNormTPrime**2)*muTPrime)
 
-        
-        muTPrime = np.zeros(NTPrime)
-        for TPrimeInd in np.arange(NTPrime):
-            # Solve eigenvalue problem LTPrimeij x = mu_TPrime Mij x
-            eigenvalues = scipy.linalg.eigvals(LTPrimeij[TPrimeInd][:-1,:-1], Mij[:-1,:-1])
-            muTPrime[TPrimeInd] = np.max(np.real(eigenvalues))
-
-            if relANewPatch is None:
-                aPatchTPrime = self.fsi.aPatch[TPrimeFinetStartIndices[TPrimeInd] + TPrimeFinetIndexMap]
-                aNewPatchTPrime = aNewPatch[TPrimeFinetStartIndices[TPrimeInd] + TPrimeFinetIndexMap]
-                deltaMaxNormTPrime[TPrimeInd] = np.max(np.abs((aPatchTPrime - aNewPatchTPrime)/
-                                                              np.sqrt(aPatchTPrime*aNewPatchTPrime)))
-
-        np.set_printoptions(linewidth=220)
-        print ''
-        print np.reshape(muTPrime, [7,7])
-        print np.reshape(deltaMaxNormTPrime, [7,7])
-        pass
+        return epsilonTSquare
         
 # def computeElementCorrectorDirichletBC(NPatchCoarse,
 #                                        NCoarseElement,

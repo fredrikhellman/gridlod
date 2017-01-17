@@ -115,8 +115,8 @@ class corrector_TestCase(unittest.TestCase):
 
         ec.computeCoarseQuantities()
         # Test that the matrices have the constants in their null space
-        self.assertTrue(np.allclose(np.sum(ec.csi.LTPrimeij, axis=1), 0))
-        self.assertTrue(np.allclose(np.sum(ec.csi.LTPrimeij, axis=2), 0))
+        #self.assertTrue(np.allclose(np.sum(ec.csi.LTPrimeij, axis=1), 0))
+        #self.assertTrue(np.allclose(np.sum(ec.csi.LTPrimeij, axis=2), 0))
 
         self.assertTrue(np.allclose(np.sum(ec.csi.Kij, axis=0), 0))
         self.assertTrue(np.allclose(np.sum(ec.csi.Kij, axis=1), 0))
@@ -125,11 +125,8 @@ class corrector_TestCase(unittest.TestCase):
         # verifies that most "energy" is in the element T.
         patchElementIndexBasis = util.linearpIndexBasis(ec.NPatchCoarse-1)
         elementTIndex = np.dot(patchElementIndexBasis, ec.iElementPatchCoarse)
-        v = np.zeros(2**d)
-        v[0] = 1
-        intensity = np.dot(np.dot(ec.csi.LTPrimeij, v), v)
-        self.assertTrue(np.all(intensity[elementTIndex] >= intensity))
-        self.assertTrue(not np.all(intensity[elementTIndex+1] >= intensity))
+        self.assertTrue(np.all(ec.csi.muTPrime[elementTIndex] >= ec.csi.muTPrime))
+        self.assertTrue(not np.all(ec.csi.muTPrime[elementTIndex+1] >= ec.csi.muTPrime))
         ec.clearFineQuantities()
 
     def test_computeFullDomain(self):
@@ -196,25 +193,67 @@ class corrector_TestCase(unittest.TestCase):
         NpWorldFine = np.prod(NWorldFine+1)
         NpWorldCoarse = np.prod(NWorldCoarse+1)
         NtWorldFine = np.prod(NWorldCoarse*NCoarseElement)
+        NtWorldCoarse = np.prod(NWorldCoarse)
 
         np.random.seed(0)
 
         world = World(NWorldCoarse, NCoarseElement)
         d = np.size(NWorldCoarse)
-        IWorld = interp.L2ProjectionPatchMatrix(0*NWorldCoarse, NWorldCoarse, NWorldCoarse, NCoarseElement)
-        aWorld = np.exp(np.random.rand(NtWorldFine))
+        aBase = np.exp(np.random.rand(NtWorldFine))
         k = np.max(NWorldCoarse)
+        iElementWorldCoarse = np.array([3,3])
 
-        aWorldNew = aWorld*(1+0.1*np.random.rand(NtWorldFine))
 
-        iElementWorldCoarse = np.array([3, 3])
+        TFinetStartIndices = util.pIndexMap(NWorldCoarse-1, NWorldFine-1, NCoarseElement)
+        TFinetIndexMap = util.lowerLeftpIndexMap(NCoarseElement-1, NWorldFine-1)
 
-        # Use full resolution new A
+        coarseElementtIndexTensor = np.add.outer(TFinetIndexMap, TFinetStartIndices)
+
+        relAFirst = 1+3*np.random.rand(NtWorldCoarse)
+        aFirst = np.array(aBase)
+        aFirst[coarseElementtIndexTensor] *= relAFirst
         ec = lod.ElementCorrector(world, k, iElementWorldCoarse)
-        ec.computeCorrectors(aWorld, IWorld)
-        ec.computeCoarseQuantities()
-        ec.computeErrorIndicator(aWorldNew)
+        IPatch = interp.L2ProjectionPatchMatrix(ec.iPatchWorldCoarse, ec.NPatchCoarse, NWorldCoarse, NCoarseElement)
+        ec.computeCorrectors(aFirst, IPatch)
+        ec.computeCoarseQuantities(relAFirst)
 
+        # If both relAFirst and relASecond are equal, the error indicator should be zero
+        relASecond = np.array(relAFirst)
+        aSecond = np.array(aBase)
+        aSecond[coarseElementtIndexTensor] *= relASecond
+        self.assertTrue(np.isclose(ec.computeErrorIndicator(relASecond), 0))
+
+        # If relASecond is not relAFirst, the error indicator should not be zero
+        relASecond = 2*np.array(relAFirst)
+        aSecond = np.array(aBase)
+        aSecond[coarseElementtIndexTensor] *= relASecond
+        self.assertTrue(ec.computeErrorIndicator(relASecond) >= 0.1)
+
+        # If relASecond is different in the element itself, the error
+        # indicator should be large
+        linearCoarsetBasis = util.linearpIndexBasis(NWorldCoarse-1)
+        elementCoarseIndex = np.dot(linearCoarsetBasis, iElementWorldCoarse)
+        relASecond = np.array(relAFirst)
+        relASecond[elementCoarseIndex] *= 2
+        aSecond = np.array(aBase)
+        aSecond[coarseElementtIndexTensor] *= relASecond
+        saveForNextTest = ec.computeErrorIndicator(relASecond)
+        self.assertTrue(saveForNextTest >= 0.1)
+
+        # A difference in the perifery should be smaller than in the center
+        relASecond = np.array(relAFirst)
+        relASecond[0] *= 2
+        aSecond = np.array(aBase)
+        aSecond[coarseElementtIndexTensor] *= relASecond
+        self.assertTrue(saveForNextTest > ec.computeErrorIndicator(relASecond))
+
+        # Again, but closer
+        relASecond = np.array(relAFirst)
+        relASecond[elementCoarseIndex-1] *= 2
+        aSecond = np.array(aBase)
+        aSecond[coarseElementtIndexTensor] *= relASecond
+        self.assertTrue(saveForNextTest > ec.computeErrorIndicator(relASecond))
+        
         
 if __name__ == '__main__':
     #    import cProfile
