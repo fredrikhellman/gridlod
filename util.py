@@ -54,11 +54,13 @@ def extractPatchFine(NCoarse,
                      NPatchCoarse,
                      extractElements=True):
     NFine = NCoarse*NCoarseElement
-    fineIndexBasis = linearpIndexBasis(NFine)
-    patchFineIndexStart = np.dot(fineIndexBasis, iPatchCoarse*NCoarseElement)
     if extractElements:
-        patchFineIndexMap = lowerLeftpIndexMap(NPatchCoarse*NCoarseElement-1, NFine)
+        fineIndexBasis = linearpIndexBasis(NFine-1)
+        patchFineIndexStart = np.dot(fineIndexBasis, iPatchCoarse*NCoarseElement)
+        patchFineIndexMap = lowerLeftpIndexMap(NPatchCoarse*NCoarseElement-1, NFine-1)
     else:
+        fineIndexBasis = linearpIndexBasis(NFine)
+        patchFineIndexStart = np.dot(fineIndexBasis, iPatchCoarse*NCoarseElement)
         patchFineIndexMap = lowerLeftpIndexMap(NPatchCoarse*NCoarseElement, NFine)
     return patchFineIndexStart + patchFineIndexMap
 
