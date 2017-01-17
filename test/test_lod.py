@@ -1,5 +1,6 @@
 import unittest
 import numpy as np
+import itertools as it
 
 from world import World
 import lod
@@ -94,7 +95,7 @@ class corrector_TestCase(unittest.TestCase):
         self.assertTrue(np.all(ec.iElementPatchCoarse == [1, 1]))
         self.assertTrue(np.all(ec.iPatchWorldCoarse == [0, 1]))
         
-    def test_compute(self):
+    def test_computeSingleT(self):
         NWorldCoarse = np.array([4, 5, 6])
         NCoarseElement = np.array([5, 2, 3])
         world = World(NWorldCoarse, NCoarseElement)
@@ -129,9 +130,96 @@ class corrector_TestCase(unittest.TestCase):
         intensity = np.dot(np.dot(ec.csi.LTPrimeij, v), v)
         self.assertTrue(np.all(intensity[elementTIndex] >= intensity))
         self.assertTrue(not np.all(intensity[elementTIndex+1] >= intensity))
-        
         ec.clearFineQuantities()
+
+    def test_computeFullDomain(self):
+        NWorldCoarse = np.array([2, 3, 4], dtype='int64')
+        NWorldCoarse = np.array([1, 1, 1], dtype='int64')
+        NCoarseElement = np.array([4, 2, 3], dtype='int64')
+        NWorldFine = NWorldCoarse*NCoarseElement
+        NpWorldFine = np.prod(NWorldFine+1)
+        NpWorldCoarse = np.prod(NWorldCoarse+1)
+        NtWorldFine = np.prod(NWorldCoarse*NCoarseElement)
+
+        np.random.seed(0)
+
+        world = World(NWorldCoarse, NCoarseElement)
+        d = np.size(NWorldCoarse)
+        IWorld = interp.nodalPatchMatrix(0*NWorldCoarse, NWorldCoarse, NWorldCoarse, NCoarseElement)
+        aWorld = np.exp(np.random.rand(NtWorldFine))
+        k = np.max(NWorldCoarse)
+
+        elementpIndexMap = util.lowerLeftpIndexMap(np.ones_like(NWorldCoarse), NWorldCoarse)
+        elementpIndexMapFine = util.lowerLeftpIndexMap(NCoarseElement, NWorldFine)
+        
+        coarsepBasis = util.linearpIndexBasis(NWorldCoarse)
+        finepBasis = util.linearpIndexBasis(NWorldFine)
+
+        correctors = np.zeros((NpWorldFine, NpWorldCoarse))
+        basis = np.zeros((NpWorldFine, NpWorldCoarse))
+        
+        for iElementWorldCoarse in it.product(*[np.arange(n, dtype='int64') for n in NWorldCoarse]):
+            iElementWorldCoarse = np.array(iElementWorldCoarse)
+            ec = lod.ElementCorrector(world, k, iElementWorldCoarse)
+            ec.computeCorrectors(aWorld, IWorld)
+            
+            worldpIndices = np.dot(coarsepBasis, iElementWorldCoarse) + elementpIndexMap
+            correctors[:,worldpIndices] += np.column_stack(ec.fsi.correctorsList)
+
+            worldpFineIndices = np.dot(finepBasis, iElementWorldCoarse*NCoarseElement) + elementpIndexMapFine
+            basis[np.ix_(worldpFineIndices, worldpIndices)] = world.localBasis
+
+        AGlob = fem.assemblePatchMatrix(NWorldFine, world.ALoc, aWorld)
+
+        alpha = np.random.rand(NpWorldCoarse)
+        vH  = np.dot(basis, alpha)
+        QvH = np.dot(correctors, alpha)
+
+        # Check norm inequality
+        self.assertTrue(np.dot(QvH.T, AGlob*QvH) <= np.dot(vH.T, AGlob*vH))
+
+        # Check that correctors are really fine functions
+        self.assertTrue(np.isclose(np.linalg.norm(IWorld*correctors, ord=np.inf), 0))
+
+        v = np.random.rand(NpWorldFine, NpWorldCoarse)
+        v[util.boundarypIndexMap(NWorldFine)] = 0
+        # The chosen interpolation operator doesn't ruin the boundary conditions.
+        vf = v-np.dot(basis, IWorld*v)
+        vf = vf/np.sqrt(np.sum(vf*(AGlob*vf), axis=0))
+        # Check orthogonality
+        self.assertTrue(np.isclose(np.linalg.norm(np.dot(vf.T, AGlob*(correctors - basis)), ord=np.inf), 0))
+
+    def test_computeErrorIndicator(self):
+        NWorldCoarse = np.array([7, 7], dtype='int64')
+        NCoarseElement = np.array([10, 10], dtype='int64')
+        NWorldFine = NWorldCoarse*NCoarseElement
+        NpWorldFine = np.prod(NWorldFine+1)
+        NpWorldCoarse = np.prod(NWorldCoarse+1)
+        NtWorldFine = np.prod(NWorldCoarse*NCoarseElement)
+
+        np.random.seed(0)
+
+        world = World(NWorldCoarse, NCoarseElement)
+        d = np.size(NWorldCoarse)
+        IWorld = interp.L2ProjectionPatchMatrix(0*NWorldCoarse, NWorldCoarse, NWorldCoarse, NCoarseElement)
+        aWorld = np.exp(np.random.rand(NtWorldFine))
+        k = np.max(NWorldCoarse)
+
+        aWorldNew = aWorld*(1+0.1*np.random.rand(NtWorldFine))
+
+        iElementWorldCoarse = np.array([3, 3])
+
+        # Use full resolution new A
+        ec = lod.ElementCorrector(world, k, iElementWorldCoarse)
+        ec.computeCorrectors(aWorld, IWorld)
+        ec.computeCoarseQuantities()
+        ec.computeErrorIndicator(aWorldNew)
+
+        
 if __name__ == '__main__':
+    #    import cProfile
+    #    command = """unittest.main()"""
+    #    cProfile.runctx( command, globals(), locals(), filename="test_lod.profile" )
     unittest.main()
 
 
