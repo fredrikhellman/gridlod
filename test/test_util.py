@@ -3,6 +3,25 @@ import numpy as np
 
 import util
 
+class convert_TestCase(unittest.TestCase):
+    def test_convertpCoordinateToIndex(self):
+        N = np.array([100])
+        coord = np.array([44])
+        self.assertTrue(util.convertpCoordinateToIndex(N, coord) == 44)
+
+        N = np.array([100, 200])
+        coord = np.array([44, 55])
+        self.assertTrue(util.convertpCoordinateToIndex(N, coord) == 44+55*101)
+
+    def test_convertpIndexToCoordinate(self):
+        N = np.array([100])
+        ind = np.array([44])
+        self.assertTrue(np.all(util.convertpIndexToCoordinate(N, ind) == [44]))
+
+        N = np.array([100, 200])
+        ind = 44+55*101
+        self.assertTrue(np.all(util.convertpIndexToCoordinate(N, ind) == [44, 55]))
+        
 class pIndexMap_TestCase(unittest.TestCase):
     def test_trivials1d(self):
         # 1D

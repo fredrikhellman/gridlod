@@ -73,25 +73,25 @@ class corrector_TestCase(unittest.TestCase):
         k = 1
 
         iElementWorldCoarse = np.array([0, 0])
-        ec = lod.ElementCorrector(world, k, iElementWorldCoarse)
+        ec = lod.elementCorrector(world, k, iElementWorldCoarse)
         self.assertTrue(np.all(ec.NPatchCoarse == [2, 2]))
         self.assertTrue(np.all(ec.iElementPatchCoarse == [0, 0]))
         self.assertTrue(np.all(ec.iPatchWorldCoarse == [0, 0]))
         
         iElementWorldCoarse = np.array([0, 3])
-        ec = lod.ElementCorrector(world, k, iElementWorldCoarse)
+        ec = lod.elementCorrector(world, k, iElementWorldCoarse)
         self.assertTrue(np.all(ec.NPatchCoarse == [2, 2]))
         self.assertTrue(np.all(ec.iElementPatchCoarse == [0, 1]))
         self.assertTrue(np.all(ec.iPatchWorldCoarse == [0, 2]))
 
         iElementWorldCoarse = np.array([0, 2])
-        ec = lod.ElementCorrector(world, k, iElementWorldCoarse)
+        ec = lod.elementCorrector(world, k, iElementWorldCoarse)
         self.assertTrue(np.all(ec.NPatchCoarse == [2, 3]))
         self.assertTrue(np.all(ec.iElementPatchCoarse == [0, 1]))
         self.assertTrue(np.all(ec.iPatchWorldCoarse == [0, 1]))
 
         iElementWorldCoarse = np.array([1, 2])
-        ec = lod.ElementCorrector(world, k, iElementWorldCoarse)
+        ec = lod.elementCorrector(world, k, iElementWorldCoarse)
         self.assertTrue(np.all(ec.NPatchCoarse == [3, 3]))
         self.assertTrue(np.all(ec.iElementPatchCoarse == [1, 1]))
         self.assertTrue(np.all(ec.iPatchWorldCoarse == [0, 1]))
@@ -104,7 +104,7 @@ class corrector_TestCase(unittest.TestCase):
         
         k = 1
         iElementWorldCoarse = np.array([2, 1, 2])
-        ec = lod.ElementCorrector(world, k, iElementWorldCoarse)
+        ec = lod.elementCorrector(world, k, iElementWorldCoarse)
         IPatch = interp.nodalPatchMatrix(ec.iPatchWorldCoarse, ec.NPatchCoarse, NWorldCoarse, NCoarseElement)
 
         NtPatch = np.prod(ec.NPatchCoarse*NCoarseElement)
@@ -124,8 +124,7 @@ class corrector_TestCase(unittest.TestCase):
 
         # I had difficulties come up with test cases here. This test
         # verifies that most "energy" is in the element T.
-        patchElementIndexBasis = util.linearpIndexBasis(ec.NPatchCoarse-1)
-        elementTIndex = np.dot(patchElementIndexBasis, ec.iElementPatchCoarse)
+        elementTIndex = util.convertpCoordinateToIndex(ec.NPatchCoarse-1, ec.iElementPatchCoarse)
         self.assertTrue(np.all(ec.csi.muTPrime[elementTIndex] >= ec.csi.muTPrime))
         self.assertTrue(not np.all(ec.csi.muTPrime[elementTIndex+1] >= ec.csi.muTPrime))
         ec.clearFineQuantities()
@@ -159,7 +158,7 @@ class corrector_TestCase(unittest.TestCase):
         
         for iElementWorldCoarse in it.product(*[np.arange(n, dtype='int64') for n in NWorldCoarse]):
             iElementWorldCoarse = np.array(iElementWorldCoarse)
-            ec = lod.ElementCorrector(world, k, iElementWorldCoarse)
+            ec = lod.elementCorrector(world, k, iElementWorldCoarse)
             ec.computeCorrectors(coefficientWorld, IWorld)
             
             worldpIndices = np.dot(coarsepBasis, iElementWorldCoarse) + elementpIndexMap
@@ -207,7 +206,7 @@ class corrector_TestCase(unittest.TestCase):
 
         rCoarseFirst = 1+3*np.random.rand(NtWorldCoarse)
         coefFirst = coef.coefficientCoarseFactor(NWorldCoarse, NCoarseElement, aBase, rCoarseFirst)
-        ec = lod.ElementCorrector(world, k, iElementWorldCoarse)
+        ec = lod.elementCorrector(world, k, iElementWorldCoarse)
         IPatch = interp.L2ProjectionPatchMatrix(ec.iPatchWorldCoarse, ec.NPatchCoarse, NWorldCoarse, NCoarseElement)
         ec.computeCorrectors(coefFirst, IPatch)
         ec.computeCoarseQuantities()
@@ -222,8 +221,7 @@ class corrector_TestCase(unittest.TestCase):
 
         # If rCoarseSecond is different in the element itself, the error
         # indicator should be large
-        linearCoarsetBasis = util.linearpIndexBasis(NWorldCoarse-1)
-        elementCoarseIndex = np.dot(linearCoarsetBasis, iElementWorldCoarse)
+        elementCoarseIndex = util.convertpCoordinateToIndex(NWorldCoarse-1, iElementWorldCoarse)
         rCoarseSecond = np.array(rCoarseFirst)
         rCoarseSecond[elementCoarseIndex] *= 2
         saveForNextTest = ec.computeErrorIndicator(rCoarseSecond)
@@ -249,7 +247,7 @@ if __name__ == '__main__':
 
 
 
-# class computeElementCorrectorDirichletBC_TestCase(unittest.TestCase):
+# class computeelementCorrectorDirichletBC_TestCase(unittest.TestCase):
 #     def test_trivial(self):
 #         return
 #         NPatchCoarse = np.array([3,3])
@@ -270,7 +268,7 @@ if __name__ == '__main__':
 #         localBasis = fem.localBasis(NCoarseElement)
 #         IPatch = interp.nodalPatchMatrix(np.array([0, 0]), NPatchCoarse, NPatchCoarse, NCoarseElement)
         
-#         correctorsFull = lod.computeElementCorrectorDirichletBC(NPatchCoarse,
+#         correctorsFull = lod.computeelementCorrectorDirichletBC(NPatchCoarse,
 #                                                                 NCoarseElement,
 #                                                                 iElementCoarse,
 #                                                                 APatchFull,
@@ -317,7 +315,7 @@ if __name__ == '__main__':
 #         localBasis = fem.localBasis(NCoarseElement)
 #         IPatch = interp.L2ProjectionPatchMatrix(np.array([0, 0, 0]), NPatchCoarse, NPatchCoarse, NCoarseElement)
         
-#         correctorsFull = lod.computeElementCorrectorDirichletBC(NPatchCoarse,
+#         correctorsFull = lod.computeelementCorrectorDirichletBC(NPatchCoarse,
 #                                                                 NCoarseElement,
 #                                                                 iElementCoarse,
 #                                                                 APatchFull,

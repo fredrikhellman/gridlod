@@ -103,7 +103,7 @@ def ritzProjectionToFinePatchWithGivenSaddleSolver(NPatchCoarse,
 
     return projectionsList
 
-class ElementCorrector:
+class elementCorrector:
     def __init__(self, world, k, iElementWorldCoarse, saddleSolver=None):
         self.k = k
         self.iElementWorldCoarse = iElementWorldCoarse[:]
@@ -242,8 +242,7 @@ class ElementCorrector:
         TPrimeFinepStartIndices = util.pIndexMap(NPatchCoarse-1, NPatchFine, NCoarseElement)
         TPrimeFinepIndexMap = util.lowerLeftpIndexMap(NCoarseElement, NPatchFine)
 
-        patchElementIndexBasis = util.linearpIndexBasis(NPatchCoarse-1)
-        TInd = np.dot(patchElementIndexBasis, self.iElementPatchCoarse)
+        TInd = util.convertpCoordinateToIndex(NPatchCoarse-1, self.iElementPatchCoarse)
         
         # This loop can probably be done faster than this. If a bottle-neck, fix!
         Kij = np.zeros((NpPatchCoarse, 2**d))
@@ -300,8 +299,7 @@ class ElementCorrector:
         NCoarseElement = world.NCoarseElement
         iElementPatchCoarse = self.iElementPatchCoarse
 
-        linearCoarsetBasis = util.linearpIndexBasis(NPatchCoarse-1)
-        elementCoarseIndex = np.dot(linearCoarsetBasis, iElementPatchCoarse)
+        elementCoarseIndex = util.convertpCoordinateToIndex(NPatchCoarse-1, iElementPatchCoarse)
         
         rCoarse = self.csi.rCoarse
         muTPrime = self.csi.muTPrime
@@ -312,7 +310,7 @@ class ElementCorrector:
 
         return np.sqrt(epsilonTSquare)
         
-# def computeElementCorrectorDirichletBC(NPatchCoarse,
+# def computeelementCorrectorDirichletBC(NPatchCoarse,
 #                                        NCoarseElement,
 #                                        iElementCoarse,
 #                                        APatchFull,

@@ -15,6 +15,20 @@ def linearpIndexBasis(N):
     b = np.hstack([[1], cp[:-1]])
     return b
 
+def convertpIndexToCoordinate(N, ind):
+    d = np.size(N)
+    basis = linearpIndexBasis(N)
+    coord = np.zeros_like(N)
+    for i in range(d-1,-1,-1):
+        coord[i] = ind//basis[i]
+        ind -= coord[i]*basis[i]
+    assert(ind == 0)
+    return coord
+    
+def convertpCoordinateToIndex(N, coord):
+    basis = linearpIndexBasis(N)
+    return np.dot(basis, coord)
+
 def interiorpIndexMap(N):
     """Compute indices (linear order) of all interior points."""
     preIndexMap = lowerLeftpIndexMap(N-2, N)

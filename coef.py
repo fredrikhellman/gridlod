@@ -59,12 +59,12 @@ class coefficientCoarseFactor(coefficientAbstract, coefficientCoarseFactorAbstra
 
         # rCoarse
         coarseTIndexMap = util.lowerLeftpIndexMap(NSubPatchCoarse-1, NPatchCoarse-1)
-        coarseTStartIndex = np.dot(util.linearpIndexBasis(NPatchCoarse-1), iSubPatchCoarse)
+        coarseTStartIndex = util.convertpCoordinateToIndex(NPatchCoarse-1, iSubPatchCoarse)
         rCoarseLocalized = self._rCoarse[coarseTStartIndex + coarseTIndexMap]
 
         # a
         coarsetIndexMap = util.lowerLeftpIndexMap(NSubPatchFine-1, NPatchFine-1)
-        coarsetStartIndex = np.dot(util.linearpIndexBasis(NPatchFine-1), iSubPatchFine)
+        coarsetStartIndex = util.convertpCoordinateToIndex(NPatchFine-1, iSubPatchFine)
         aLocalized = a[coarsetStartIndex + coarsetIndexMap]
 
         localizedCoefficient = coefficientCoarseFactor(NSubPatchCoarse, NCoarseElement, None, rCoarseLocalized)
