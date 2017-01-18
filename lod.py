@@ -8,9 +8,6 @@ import util
 import linalg
 import coef
 
-# Ide, att gilla eller forkasta: byt it koordinatbeskrivning av
-# elementet till indexbeskrivning.
-
 # Saddle point problem solvers
 class nullspaceSolver:
     def __init__(self, NPatchCoarse, NCoarseElement):

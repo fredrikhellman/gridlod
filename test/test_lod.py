@@ -108,7 +108,7 @@ class corrector_TestCase(unittest.TestCase):
         IPatch = interp.nodalPatchMatrix(ec.iPatchWorldCoarse, ec.NPatchCoarse, NWorldCoarse, NCoarseElement)
 
         NtPatch = np.prod(ec.NPatchCoarse*NCoarseElement)
-        coefficientPatch = coef.coefficientFine(np.ones(NtPatch))
+        coefficientPatch = coef.coefficientFine(ec.NPatchCoarse, NCoarseElement, np.ones(NtPatch))
         ec.computeCorrectors(coefficientPatch, IPatch)
 
         correctorSum = reduce(np.add, ec.fsi.correctorsList)
@@ -144,7 +144,7 @@ class corrector_TestCase(unittest.TestCase):
         d = np.size(NWorldCoarse)
         IWorld = interp.nodalPatchMatrix(0*NWorldCoarse, NWorldCoarse, NWorldCoarse, NCoarseElement)
         aWorld = np.exp(np.random.rand(NtWorldFine))
-        coefficientWorld = coef.coefficientFine(aWorld)
+        coefficientWorld = coef.coefficientFine(NWorldCoarse, NCoarseElement, aWorld)
         k = np.max(NWorldCoarse)
 
         elementpIndexMap = util.lowerLeftpIndexMap(np.ones_like(NWorldCoarse), NWorldCoarse)

@@ -14,8 +14,25 @@ class coefficientCoarseFactorAbstract:
     
     
 class coefficientFine(coefficientAbstract):
-    def __init__(self, aFine):
+    def __init__(self, NPatchCoarse, NCoarseElement, aFine):
+        self.NPatchCoarse = np.array(NPatchCoarse)
+        self.NCoarseElement = NCoarseElement
         self._aFine = aFine
+
+    def localize(self, iSubPatchCoarse, NSubPatchCoarse):
+        NPatchCoarse = self.NPatchCoarse
+        NCoarseElement = self.NCoarseElement
+        NPatchFine = NPatchCoarse*NCoarseElement
+        NSubPatchFine = NSubPatchCoarse*NCoarseElement
+        iSubPatchFine = iSubPatchCoarse*NCoarseElement
+
+        # a
+        coarsetIndexMap = util.lowerLeftpIndexMap(NSubPatchFine-1, NPatchFine-1)
+        coarsetStartIndex = util.convertpCoordinateToIndex(NPatchFine-1, iSubPatchFine)
+        aFineLocalized = self._aFine[coarsetStartIndex + coarsetIndexMap]
+
+        localizedCoefficient = coefficientFine(NSubPatchCoarse, NCoarseElement, aFineLocalized)
+        return localizedCoefficient
 
     @property
     def aFine(self):
