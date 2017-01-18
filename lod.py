@@ -6,6 +6,10 @@ import gc
 import fem
 import util
 import linalg
+import coef
+
+# Ide, att gilla eller forkasta: byt it koordinatbeskrivning av
+# elementet till indexbeskrivning.
 
 # Saddle point problem solvers
 class nullspaceSolver:
@@ -121,16 +125,16 @@ class ElementCorrector:
             self._saddleSolver = saddleSolver
             
     class FineScaleInformation:
-        def __init__(self, aPatch, correctorsList):
-            self.aPatch = aPatch
+        def __init__(self, coefficientPatch, correctorsList):
+            self.coefficient = coefficientPatch
             self.correctorsList = correctorsList
 
     class CoarseScaleInformation:
-        def __init__(self, Kij, muTPrime, relA=None):
+        def __init__(self, Kij, muTPrime, rCoarse=None):
             self.Kij = Kij
             #self.LTPrimeij = LTPrimeij
             self.muTPrime = muTPrime
-            self.relA = relA
+            self.rCoarse = rCoarse
 
     @property
     def saddleSolver(self):
@@ -140,7 +144,7 @@ class ElementCorrector:
     def saddleSolver(self, value):
         self._saddleSolver = value
             
-    def computeCorrectors(self, aPatch, IPatch):
+    def computeCorrectors(self, coefficientPatch, IPatch):
         '''Compute the fine correctors over the patch.
 
         Compute the correctors Q_T\lambda_i (T is given by the class instance):
@@ -160,6 +164,8 @@ class ElementCorrector:
         NpCoarse = np.prod(NPatchCoarse+1)
         NpFine = np.prod(NPatchFine+1)
 
+        aPatch = coefficientPatch.aFine
+        
         assert(np.size(aPatch) == NtFine)
 
         ALoc = world.ALoc
@@ -192,9 +198,9 @@ class ElementCorrector:
                                                                             bPatchFullList,
                                                                             IPatch,
                                                                             self.saddleSolver)
-        self.fsi = self.FineScaleInformation(aPatch, correctorsList)
+        self.fsi = self.FineScaleInformation(coefficientPatch, correctorsList)
         
-    def computeCoarseQuantities(self, relAPatch=None):
+    def computeCoarseQuantities(self):
         '''Compute the coarse quantities K and L for this element corrector
 
         Compute the tensors (T is given by the class instance):
@@ -208,15 +214,6 @@ class ElementCorrector:
         Auxiliary quantities are computed, but not saved, e.g.
 
         LTT'ij = (A \nabla (chi_T - Q_T)lambda_j, \nabla (chi_T - Q_T) lambda_j)_{T'}
-
-        The argument relAPatch is for providing a coarse (patch)
-        element relative coefficient factor, i.e. if aPatch is
-        computed from a base coefficient baseA elementwise as such:
-
-           aPatch|_T = baseA|_T*relAPatch|_T   (note relAPatch|_T is constant)
-
-        If relAPatch is provided, relAPatch will be stored and can be used for
-        computing error indicators.
         '''
         assert(hasattr(self, 'fsi'))
 
@@ -231,7 +228,7 @@ class ElementCorrector:
         d = np.size(NPatchCoarse)
         
         correctorsList = self.fsi.correctorsList
-        aPatch = self.fsi.aPatch
+        aPatch = self.fsi.coefficient.aFine
 
         ALoc = world.ALoc
         localBasis = world.localBasis
@@ -284,15 +281,19 @@ class ElementCorrector:
             eigenvalues = scipy.linalg.eigvals(LTPrimeij[TPrimeInd][:-1,:-1], Aij[:-1,:-1])
             muTPrime[TPrimeInd] = np.max(np.real(eigenvalues))
 
-        self.csi = self.CoarseScaleInformation(Kij, muTPrime, relAPatch)
+        if isinstance(self.fsi.coefficient, coef.coefficientCoarseFactorAbstract):
+            rCoarse = self.fsi.coefficient.rCoarse
+        else:
+            rCoarse = None
+        self.csi = self.CoarseScaleInformation(Kij, muTPrime, rCoarse)
 
     def clearFineQuantities(self):
         assert(hasattr(self, 'fsi'))
         del self.fsi
 
-    def computeErrorIndicator(self, relANewPatch):
+    def computeErrorIndicator(self, rCoarseNew):
         assert(hasattr(self, 'csi'))
-        assert(hasattr(self.csi, 'relA'))
+        assert(self.csi.rCoarse is not None)
         
         world = self.world
         NPatchCoarse = self.NPatchCoarse
@@ -302,14 +303,14 @@ class ElementCorrector:
         linearCoarsetBasis = util.linearpIndexBasis(NPatchCoarse-1)
         elementCoarseIndex = np.dot(linearCoarsetBasis, iElementPatchCoarse)
         
-        relA = self.csi.relA
+        rCoarse = self.csi.rCoarse
         muTPrime = self.csi.muTPrime
-        deltaMaxNormTPrime = np.abs((relANewPatch - relA)/np.sqrt(relANewPatch*relA))
+        deltaMaxNormTPrime = np.abs((rCoarseNew - rCoarse)/np.sqrt(rCoarseNew*rCoarse))
 
-        epsilonTSquare = relANewPatch[elementCoarseIndex]/relA[elementCoarseIndex] * \
+        epsilonTSquare = rCoarseNew[elementCoarseIndex]/rCoarse[elementCoarseIndex] * \
                          np.sum((deltaMaxNormTPrime**2)*muTPrime)
 
-        return epsilonTSquare
+        return np.sqrt(epsilonTSquare)
         
 # def computeElementCorrectorDirichletBC(NPatchCoarse,
 #                                        NCoarseElement,

@@ -7,6 +7,7 @@ import lod
 import fem
 import interp
 import util
+import coef
 
 class ritzProjectionToFinePatch_TestCase(unittest.TestCase):
     def test_trivial(self):
@@ -107,8 +108,8 @@ class corrector_TestCase(unittest.TestCase):
         IPatch = interp.nodalPatchMatrix(ec.iPatchWorldCoarse, ec.NPatchCoarse, NWorldCoarse, NCoarseElement)
 
         NtPatch = np.prod(ec.NPatchCoarse*NCoarseElement)
-        aPatch = np.ones(NtPatch)
-        ec.computeCorrectors(aPatch, IPatch)
+        coefficientPatch = coef.coefficientFine(np.ones(NtPatch))
+        ec.computeCorrectors(coefficientPatch, IPatch)
 
         correctorSum = reduce(np.add, ec.fsi.correctorsList)
         self.assertTrue(np.allclose(correctorSum, 0))
@@ -144,6 +145,7 @@ class corrector_TestCase(unittest.TestCase):
         d = np.size(NWorldCoarse)
         IWorld = interp.nodalPatchMatrix(0*NWorldCoarse, NWorldCoarse, NWorldCoarse, NCoarseElement)
         aWorld = np.exp(np.random.rand(NtWorldFine))
+        coefficientWorld = coef.coefficientFine(aWorld)
         k = np.max(NWorldCoarse)
 
         elementpIndexMap = util.lowerLeftpIndexMap(np.ones_like(NWorldCoarse), NWorldCoarse)
@@ -158,7 +160,7 @@ class corrector_TestCase(unittest.TestCase):
         for iElementWorldCoarse in it.product(*[np.arange(n, dtype='int64') for n in NWorldCoarse]):
             iElementWorldCoarse = np.array(iElementWorldCoarse)
             ec = lod.ElementCorrector(world, k, iElementWorldCoarse)
-            ec.computeCorrectors(aWorld, IWorld)
+            ec.computeCorrectors(coefficientWorld, IWorld)
             
             worldpIndices = np.dot(coarsepBasis, iElementWorldCoarse) + elementpIndexMap
             correctors[:,worldpIndices] += np.column_stack(ec.fsi.correctorsList)
@@ -203,56 +205,39 @@ class corrector_TestCase(unittest.TestCase):
         k = np.max(NWorldCoarse)
         iElementWorldCoarse = np.array([3,3])
 
-
-        TFinetStartIndices = util.pIndexMap(NWorldCoarse-1, NWorldFine-1, NCoarseElement)
-        TFinetIndexMap = util.lowerLeftpIndexMap(NCoarseElement-1, NWorldFine-1)
-
-        coarseElementtIndexTensor = np.add.outer(TFinetIndexMap, TFinetStartIndices)
-
-        relAFirst = 1+3*np.random.rand(NtWorldCoarse)
-        aFirst = np.array(aBase)
-        aFirst[coarseElementtIndexTensor] *= relAFirst
+        rCoarseFirst = 1+3*np.random.rand(NtWorldCoarse)
+        coefFirst = coef.coefficientCoarseFactor(NWorldCoarse, NCoarseElement, aBase, rCoarseFirst)
         ec = lod.ElementCorrector(world, k, iElementWorldCoarse)
         IPatch = interp.L2ProjectionPatchMatrix(ec.iPatchWorldCoarse, ec.NPatchCoarse, NWorldCoarse, NCoarseElement)
-        ec.computeCorrectors(aFirst, IPatch)
-        ec.computeCoarseQuantities(relAFirst)
+        ec.computeCorrectors(coefFirst, IPatch)
+        ec.computeCoarseQuantities()
 
-        # If both relAFirst and relASecond are equal, the error indicator should be zero
-        relASecond = np.array(relAFirst)
-        aSecond = np.array(aBase)
-        aSecond[coarseElementtIndexTensor] *= relASecond
-        self.assertTrue(np.isclose(ec.computeErrorIndicator(relASecond), 0))
+        # If both rCoarseFirst and rCoarseSecond are equal, the error indicator should be zero
+        rCoarseSecond = np.array(rCoarseFirst)
+        self.assertTrue(np.isclose(ec.computeErrorIndicator(rCoarseSecond), 0))
 
-        # If relASecond is not relAFirst, the error indicator should not be zero
-        relASecond = 2*np.array(relAFirst)
-        aSecond = np.array(aBase)
-        aSecond[coarseElementtIndexTensor] *= relASecond
-        self.assertTrue(ec.computeErrorIndicator(relASecond) >= 0.1)
+        # If rCoarseSecond is not rCoarseFirst, the error indicator should not be zero
+        rCoarseSecond = 2*np.array(rCoarseFirst)
+        self.assertTrue(ec.computeErrorIndicator(rCoarseSecond) >= 0.1)
 
-        # If relASecond is different in the element itself, the error
+        # If rCoarseSecond is different in the element itself, the error
         # indicator should be large
         linearCoarsetBasis = util.linearpIndexBasis(NWorldCoarse-1)
         elementCoarseIndex = np.dot(linearCoarsetBasis, iElementWorldCoarse)
-        relASecond = np.array(relAFirst)
-        relASecond[elementCoarseIndex] *= 2
-        aSecond = np.array(aBase)
-        aSecond[coarseElementtIndexTensor] *= relASecond
-        saveForNextTest = ec.computeErrorIndicator(relASecond)
+        rCoarseSecond = np.array(rCoarseFirst)
+        rCoarseSecond[elementCoarseIndex] *= 2
+        saveForNextTest = ec.computeErrorIndicator(rCoarseSecond)
         self.assertTrue(saveForNextTest >= 0.1)
 
         # A difference in the perifery should be smaller than in the center
-        relASecond = np.array(relAFirst)
-        relASecond[0] *= 2
-        aSecond = np.array(aBase)
-        aSecond[coarseElementtIndexTensor] *= relASecond
-        self.assertTrue(saveForNextTest > ec.computeErrorIndicator(relASecond))
+        rCoarseSecond = np.array(rCoarseFirst)
+        rCoarseSecond[0] *= 2
+        self.assertTrue(saveForNextTest > ec.computeErrorIndicator(rCoarseSecond))
 
         # Again, but closer
-        relASecond = np.array(relAFirst)
-        relASecond[elementCoarseIndex-1] *= 2
-        aSecond = np.array(aBase)
-        aSecond[coarseElementtIndexTensor] *= relASecond
-        self.assertTrue(saveForNextTest > ec.computeErrorIndicator(relASecond))
+        rCoarseSecond = np.array(rCoarseFirst)
+        rCoarseSecond[elementCoarseIndex-1] *= 2
+        self.assertTrue(saveForNextTest > ec.computeErrorIndicator(rCoarseSecond))
         
         
 if __name__ == '__main__':
