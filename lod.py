@@ -65,8 +65,9 @@ class directSolver:
     def solve(self, A, I, bList, fixed, NPatchCoarse=None, NCoarseElement=None):
         return linalg.saddleDirect(A, I, bList, fixed)
     
-def ritzProjectionToFinePatch(NPatchCoarse,
-                              NCoarseElement,
+def ritzProjectionToFinePatch(world,
+                              iPatchWorldCoarse,
+                              NPatchCoarse,
                               APatchFull,
                               bPatchFullList,
                               IPatch):
@@ -74,21 +75,23 @@ def ritzProjectionToFinePatch(NPatchCoarse,
     #saddleSolver = nullspaceOneLevelHierarchySolver(NPatchCoarse, NCoarseElement)
     saddleSolver = schurComplementSolver()  # Fast for small patch problems
     
-    return ritzProjectionToFinePatchWithGivenSaddleSolver(NPatchCoarse,
-                                                          NCoarseElement,
+    return ritzProjectionToFinePatchWithGivenSaddleSolver(world,
+                                                          iPatchWorldCoarse,
+                                                          NPatchCoarse,
                                                           APatchFull,
                                                           bPatchFullList,
                                                           IPatch,
                                                           saddleSolver)
 
-def ritzProjectionToFinePatchWithGivenSaddleSolver(NPatchCoarse,
-                                                   NCoarseElement,
+def ritzProjectionToFinePatchWithGivenSaddleSolver(world,
+                                                   iPatchWorldCoarse,
+                                                   NPatchCoarse,
                                                    APatchFull,
                                                    bPatchFullList,
                                                    IPatch,
                                                    saddleSolver):
     d = np.size(NPatchCoarse)
-    NPatchFine = NPatchCoarse*NCoarseElement
+    NPatchFine = NPatchCoarse*world.NCoarseElement
     NpFine = np.prod(NPatchFine+1)
 
     fixed = util.boundarypIndexMap(NPatchFine)
@@ -114,7 +117,7 @@ def ritzProjectionToFinePatchWithGivenSaddleSolver(NPatchCoarse,
 
     #projectionsList = saddleSolver.solve(APatch, IPatch, bPatchList)
 
-    projectionsList = saddleSolver.solve(APatchFull, IPatch, bPatchFullList, fixed, NPatchCoarse, NCoarseElement)
+    projectionsList = saddleSolver.solve(APatchFull, IPatch, bPatchFullList, fixed, NPatchCoarse, world.NCoarseElement)
 
     return projectionsList
 
@@ -208,8 +211,9 @@ class elementCorrector:
             bPatchFull[elementFinepIndexMap] = AElementFull*phi
             bPatchFullList.append(bPatchFull)
 
-        correctorsList = ritzProjectionToFinePatchWithGivenSaddleSolver(NPatchCoarse,
-                                                                        NCoarseElement,
+        correctorsList = ritzProjectionToFinePatchWithGivenSaddleSolver(world,
+                                                                        self.iPatchWorldCoarse,
+                                                                        NPatchCoarse,
                                                                         APatchFull,
                                                                         bPatchFullList,
                                                                         IPatch,

@@ -92,13 +92,49 @@ class interiorpIndexMap_TestCase(unittest.TestCase):
 class boundarypIndexMap_TestCase(unittest.TestCase):
     def test_boundarypIndexMap(self):
         N = np.array([3,4,5])
-        self.assertTrue(np.all(util.boundarypIndexMapSmall(N) ==
-                               util.boundarypIndexMapLarge(N)))
-
-        N = np.array([30,10,20])
-        self.assertTrue(np.all(util.boundarypIndexMapSmall(N) ==
-                               util.boundarypIndexMapLarge(N)))
+        Np = np.prod(N+1)
+        shouldBe = np.setdiff1d(np.arange(Np), util.interiorpIndexMap(N))
+        self.assertTrue(np.all(util.boundarypIndexMapLarge(N) == shouldBe))
+                     
+        boundaryMap = np.array([[True, False],
+                                [True, True],
+                                [True, True]])
+        shouldBe = np.setdiff1d(np.arange(Np), util.interiorpIndexMap(N))
+        coords = util.pCoordinates(N)
+        shouldBe = np.setdiff1d(shouldBe, np.where(np.logical_and(coords[:,0] == 1,
+                                                   np.logical_and(coords[:,1] != 0,
+                                                   np.logical_and(coords[:,1] != 1,
+                                                   np.logical_and(coords[:,2] != 0,
+                                                                  coords[:,2] != 1)))))[0])
+        self.assertTrue(np.all(util.boundarypIndexMapLarge(N, boundaryMap) == shouldBe))
         
+        boundaryMap = np.array([[True, True],
+                                [False, True],
+                                [True, True]])
+        shouldBe = np.setdiff1d(np.arange(Np), util.interiorpIndexMap(N))
+        shouldBe = np.setdiff1d(shouldBe, np.where(np.logical_and(coords[:,0] != 0,
+                                                   np.logical_and(coords[:,0] != 1,
+                                                   np.logical_and(coords[:,1] == 0,
+                                                   np.logical_and(coords[:,2] != 0,
+                                                                  coords[:,2] != 1)))))[0])
+        self.assertTrue(np.all(util.boundarypIndexMapLarge(N, boundaryMap) == shouldBe))
+
+        boundaryMap = np.array([[True, True],
+                                [False, False],
+                                [True, True]])
+        shouldBe = np.setdiff1d(np.arange(Np), util.interiorpIndexMap(N))
+        shouldBe = np.setdiff1d(shouldBe, np.where(np.logical_and(coords[:,0] != 0,
+                                                   np.logical_and(coords[:,0] != 1,
+                                                   np.logical_and(coords[:,1] == 0,
+                                                   np.logical_and(coords[:,2] != 0,
+                                                                  coords[:,2] != 1)))))[0])
+        shouldBe = np.setdiff1d(shouldBe, np.where(np.logical_and(coords[:,0] != 0,
+                                                   np.logical_and(coords[:,0] != 1,
+                                                   np.logical_and(coords[:,1] == 1,
+                                                   np.logical_and(coords[:,2] != 0,
+                                                                  coords[:,2] != 1)))))[0])
+        self.assertTrue(np.all(util.boundarypIndexMapLarge(N, boundaryMap) == shouldBe))
+
 class extractPatchFine_TestCase(unittest.TestCase):
     def test_extractPatchFine(self):
         NCoarse = np.array([10])

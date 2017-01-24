@@ -35,22 +35,23 @@ def interiorpIndexMap(N):
     indexMap = np.sum(linearpIndexBasis(N))+preIndexMap
     return indexMap
 
-def boundarypIndexMap(N):
-    Np = np.prod(N+1)
-    return boundarypIndexMapLarge(N)
+def boundarypIndexMap(N, boundaryMap=None):
+    return boundarypIndexMapLarge(N, boundaryMap)
 
-def boundarypIndexMapSmall(N):
-    Np = np.prod(N+1)
-    return np.setdiff1d(np.arange(Np), interiorpIndexMap(N))
-    
-def boundarypIndexMapLarge(N):
+def boundarypIndexMapLarge(N, boundaryMap=None):
     d = np.size(N)
+    if boundaryMap is None:
+        boundaryMap = np.ones([d,2], dtype='bool')
     b = linearpIndexBasis(N)
     allRanges = [np.arange(Ni+1) for Ni in N]
     allIndices = np.array([], dtype='int64')
     for k in range(d):
         kRange = copy.copy(allRanges)
-        kRange[k] = [0, N[k]]
+        kRange[k] = np.array([], dtype='int64')
+        if boundaryMap[k][0]:
+            kRange[k] = np.append(kRange[k], 0)
+        if boundaryMap[k][1]:
+            kRange[k] = np.append(kRange[k], N[k])
         twoSides = np.meshgrid(*kRange)
         twoSidesIndices = reduce(np.add, map(np.multiply, b, twoSides)).flatten()
         allIndices = np.hstack([allIndices, twoSidesIndices])
