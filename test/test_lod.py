@@ -25,7 +25,8 @@ class ritzProjectionToFinePatch_TestCase(unittest.TestCase):
         PPatch = fem.assembleProlongationMatrix(NPatchCoarse, NCoarseElement)
 
         IPatchNodal = interp.nodalPatchMatrix(np.array([0, 0]), NPatchCoarse, NPatchCoarse, NCoarseElement)
-        IPatchL2 = interp.uncoupledL2ProjectionPatchMatrix(np.array([0, 0]), NPatchCoarse, NPatchCoarse, NCoarseElement)
+        #IPatchuncL2 = interp.uncoupledL2ProjectionPatchMatrix(np.array([0, 0]), NPatchCoarse, NPatchCoarse, NCoarseElement)
+        IPatchL2 = interp.L2ProjectionPatchMatrix(np.array([0, 0]), NPatchCoarse, NPatchCoarse, NCoarseElement)
 
         for IPatch in [IPatchNodal, IPatchL2]:
             np.random.seed(0)
@@ -46,8 +47,10 @@ class ritzProjectionToFinePatch_TestCase(unittest.TestCase):
                                                         APatchFull, bPatchFullList,
                                                         IPatch)
             self.assertTrue(np.isclose(np.linalg.norm(IPatch*projections[0]), 0))
+            
             self.assertTrue(np.isclose(np.dot(projections[0], APatchFull*projections[0]),
                                        np.dot(projections[0], bPatchFullList[0])))
+
             self.assertTrue(np.isclose(np.linalg.norm(projections[0][fixed]), 0))
 
             bPatchFullList = [bPatchFull, -bPatchFull]
@@ -62,6 +65,20 @@ class ritzProjectionToFinePatch_TestCase(unittest.TestCase):
                                                         IPatch)
             self.assertTrue(np.isclose(np.dot(projections[1], APatchFull*projections[0]),
                                        np.dot(projections[1], bPatchFullList[0])))
+
+            bPatchFull = np.random.rand(Np)
+            bPatchFullList = [bPatchFull]
+            projectionCheckAgainst = lod.ritzProjectionToFinePatch(NPatchCoarse, NCoarseElement,
+                                                                   APatchFull, bPatchFullList,
+                                                                   IPatch)[0]
+
+            for saddleSolver in [#lod.nullspaceOneLevelHierarchySolver(NPatchCoarse, NCoarseElement),
+                                 lod.schurComplementSolver()]:
+                projection = lod.ritzProjectionToFinePatchWithGivenSaddleSolver(NPatchCoarse, NCoarseElement,
+                                                                                APatchFull, bPatchFullList,
+                                                                                IPatch, saddleSolver)[0]
+                self.assertTrue(np.isclose(np.max(np.abs(projectionCheckAgainst-projection)), 0))
+
             
         
 class corrector_TestCase(unittest.TestCase):
@@ -167,7 +184,7 @@ class corrector_TestCase(unittest.TestCase):
             worldpFineIndices = np.dot(finepBasis, iElementWorldCoarse*NCoarseElement) + elementpIndexMapFine
             basis[np.ix_(worldpFineIndices, worldpIndices)] = world.localBasis
 
-        AGlob = fem.assemblePatchMatrix(NWorldFine, world.ALoc, aWorld)
+        AGlob = fem.assemblePatchMatrix(NWorldFine, world.ALocFine, aWorld)
 
         alpha = np.random.rand(NpWorldCoarse)
         vH  = np.dot(basis, alpha)
@@ -236,8 +253,37 @@ class corrector_TestCase(unittest.TestCase):
         rCoarseSecond = np.array(rCoarseFirst)
         rCoarseSecond[elementCoarseIndex-1] *= 2
         self.assertTrue(saveForNextTest > ec.computeErrorIndicator(rCoarseSecond))
+
+    def test_ritzProjectionToFinePatchBoundaryConditions(self):
+        NPatchCoarse = np.array([4, 4])
+        NCoarseElement = np.array([10, 10])
+        world = World(NPatchCoarse, NCoarseElement)
+
+        NPatchFine = NPatchCoarse*NCoarseElement
+        NpFine = np.prod(NPatchFine + 1)
         
+        APatchFull = fem.assemblePatchMatrix(NPatchCoarse*NCoarseElement, world.ALocFine)
+        bPatchFullList = [np.ones(NpFine)]
+
+        fixed = util.boundarypIndexMap(NPatchFine)
         
+        for IPatch in [interp.L2ProjectionPatchMatrix(0*NPatchCoarse, NPatchCoarse, NPatchCoarse, NCoarseElement),
+                       interp.nodalPatchMatrix(0*NPatchCoarse, NPatchCoarse, NPatchCoarse, NCoarseElement)]:
+
+            schurComplementSolver = lod.schurComplementSolver()
+            schurComplementSolution = lod.ritzProjectionToFinePatchWithGivenSaddleSolver(NPatchCoarse, NCoarseElement,
+                                                                                         APatchFull, bPatchFullList,
+                                                                                         IPatch,
+                                                                                         schurComplementSolver)[0]
+            self.assertTrue(np.isclose(np.max(np.abs(schurComplementSolution[fixed])), 0))
+
+#            nullspaceOneLevelHierarchySolver = lod.nullspaceOneLevelHierarchySolver(NPatchCoarse, NCoarseElement)
+#            nullspaceOneLevelHierarchySolution = lod.ritzProjectionToFinePatchWithGivenSaddleSolver(NPatchCoarse, NCoarseElement,
+#                                                                                                    APatchFull, bPatchFullList,
+#                                                                                                    IPatch,
+#                                                                                                    nullspaceOneLevelHierarchySolver)[0]
+#            self.assertTrue(np.isclose(np.max(np.abs(schurComplementSolution-nullspaceOneLevelHierarchySolution)), 0))
+
 if __name__ == '__main__':
     #    import cProfile
     #    command = """unittest.main()"""

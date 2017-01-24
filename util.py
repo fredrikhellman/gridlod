@@ -116,6 +116,17 @@ def numNeighboringElements(iPatchCoarse, NPatchCoarse, NWorldCoarse):
     numNeighboringElements = np.fromfunction(neighboringElements, shape=NPatchCoarse[::-1]+1, dtype='int64').flatten()
     return numNeighboringElements
 
+def tCoordinates(NWorld, iPatch=None, NPatch=None):
+    if NPatch is None:
+        NPatch = NWorld-1
+    else:
+        NPatch = NPatch-1
+
+    elementSize = 1./NWorld
+    p = pCoordinates(NWorld, iPatch, NPatch)
+    t = p + 0.5*elementSize
+    return t
+                    
 def pCoordinates(NWorld, iPatch=None, NPatch=None):
     if iPatch is None:
         iPatch = np.zeros_like(NWorld, dtype='int64')

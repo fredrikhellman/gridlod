@@ -114,5 +114,26 @@ class extractPatchFine_TestCase(unittest.TestCase):
                                                   extractElements=False)
         self.assertTrue(np.all(patchFineIndexMap == 6+np.arange(10)))
         
+class coordinate_TestCase(unittest.TestCase):
+    def test_pCoordinates(self):
+        NWorld = np.array([5])
+        xp = util.pCoordinates(NWorld)
+        self.assertTrue(np.allclose(xp.T - np.array([0., 1., 2., 3., 4., 5.])/5, 0))
+
+        NWorld = np.array([9, 9, 9, 9])
+        xp = util.pCoordinates(NWorld)
+        ind = util.convertpCoordinateToIndex(NWorld, [7, 3, 6, 0])
+        self.assertTrue(np.allclose(xp[ind] - np.array([7., 3., 6., 0.])/9., 0))
+        
+    def test_tCoordinates(self):
+        NWorld = np.array([5])
+        xt = util.tCoordinates(NWorld)
+        self.assertTrue(np.isclose(np.max(np.abs(xt.T - np.array([1., 3., 5., 7., 9.])/10)), 0))
+
+        NWorld = np.array([9, 9, 9, 9])
+        xt = util.tCoordinates(NWorld)
+        ind = util.convertpCoordinateToIndex(NWorld-1, [7, 3, 6, 0])
+        self.assertTrue(np.allclose(xt[ind] - np.array([15., 7., 13., 1.])/18., 0))
+        
 if __name__ == '__main__':
     unittest.main()

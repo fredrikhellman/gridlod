@@ -4,6 +4,49 @@ import scipy.sparse.linalg
 
 import sys
 import time
+import util
+
+def linSolve(K, c):
+    if np.size(K,0) > 2e5:
+        linSolver = 'cg'
+    else:
+        linSolver = 'spsolve'
+
+    if linSolver == 'spsolve':
+        print 'Using spsolve'
+        x = sparse.linalg.spsolve(K, c)
+    elif linSolver == 'cg':
+        print 'Using CG'
+        DHalfInvDiag = 1./np.sqrt(K.diagonal())
+        DHalfInv = sparse.diags([DHalfInvDiag], offsets=[0])
+        B = DHalfInv*(K*DHalfInv)
+        d = DHalfInv*c
+
+        def cgCallback(xk):
+            print np.linalg.norm(B*xk-d)
+        
+        y, info = sparse.linalg.minres(B, d, callback=cgCallback)
+        print 'info = {}'.format(info)
+        x = DHalfInv*y
+    elif linSolver == 'cholesky':
+        print 'Using cholesky'
+        cholK = cholesky(K)
+        x = cholK.solve_A(c)
+    return x
+
+def saddleDirect(A, B, rhsList, fixed):
+    K = sparse.bmat([[A, B.T],
+                     [B, None]], format='csc')
+
+    xList = []
+    for rhs in rhsList:
+        b = np.zeros(K.shape[0])
+        b[:np.size(rhs)] = rhs
+        xAll = sparse.linalg.spsolve(K, b, use_umfpack=False)
+        xList.append(xAll[:np.size(rhs)])
+
+    return xList
+
 
 def saddle(A, B, rhsList):
     ''' saddle
@@ -127,7 +170,7 @@ def saddleNullSpaceGeneralBasis(A, B, S, rhsList, coarseNodes):
         
     return correctorList
 
-def saddleNullSpaceHierarchicalBasis(A, B, P, rhsList, coarseNodes):
+def saddleNullSpaceHierarchicalBasis(A, B, P, rhsList, coarseNodes, fixed):
     '''Solve ( S'*A*S  S'*B' ) ( y  )   ( S'b )
              (    B*S  0     ) ( mu ) = ( 0   )
 
@@ -142,6 +185,9 @@ def saddleNullSpaceHierarchicalBasis(A, B, P, rhsList, coarseNodes):
     Np = A.shape[0]
     Nc = np.size(coarseNodes)
 
+    if fixed is not None:
+        raise(NotImplementedError('Boundary conditions not implemented here yet....'))
+    
     coarseNodesMask = np.zeros(Np, dtype='bool')
     coarseNodesMask[coarseNodes] = True
     notCoarseNodesMask = np.logical_not(coarseNodesMask)
@@ -192,14 +238,14 @@ def saddleNullSpaceHierarchicalBasis(A, B, P, rhsList, coarseNodes):
         b = ZT*(ST*rhs[nodePermutation])
 
         def cgCallback(xk):
-            print np.linalg.norm(ZT*(ST*(APerm*(S*(Z*xk))))-b)
+            print str(np.size(xk)) + '  ' + str(np.linalg.norm(ZT*(ST*(APerm*(S*(Z*xk))))-b))
             return
         
         mutableClosure.counter = 0
         mutableClosure.Atimer = 0
         mutableClosure.Mtimer = 0
         start = time.time()
-        xPerm,info = sparse.linalg.cg(ALinearOperator, b, callback=None, tol=1e-9, M=MInvLinearOperator)
+        xPerm,info = sparse.linalg.cg(ALinearOperator, b, callback=cgCallback, tol=1e-9, M=MInvLinearOperator)
         #print mutableClosure.counter, mutableClosure.Atimer, mutableClosure.Mtimer
         end = time.time()
         #print end-start
@@ -328,6 +374,7 @@ def saddleNullSpace(A, B, rhsList, coarseNodes):
 
 
 from scikits.sparse.cholmod import cholesky
+from scikits.sparse.cholmod import analyze
             
 def solveWithBlockDiagonalPreconditioner(A, B, bList):
     """Solve saddle point problem with block diagonal preconditioner
@@ -384,22 +431,57 @@ def solveWithBlockDiagonalPreconditioner(A, B, bList):
 
     return rList
 
-def schurComplementSolve(A, B, bList):
+class choleskyCache:
+    def __init__(self, NMax):
+        self.NMax = NMax
+        self.indexBasis = util.linearpIndexBasis(NMax)
+        self.factorCache = dict()
+
+    def lookup(self, N, A):
+        print 'lookup'
+        index = np.dot(self.indexBasis, N)
+        if index not in self.factorCache:
+            print 'miss'
+            t = time.time()
+            self.factorCache[index] = analyze(A)
+            t = time.time()-t
+            print 'a', t
+        else:
+            print 'hit'
+        cholAFactor = self.factorCache[index]
+        t = time.time()
+        cholAFactorReturn = cholAFactor.cholesky(A)
+        t = time.time()-t
+        print 'c', t
+        return cholAFactorReturn
+
+def schurComplementSolve(A, B, bList, fixed, NPatchCoarse=None, NCoarseElement=None, cholCache=None):
     correctorFreeList = []
 
     # Pre-processing (page 12, Engwer, Henning, Malqvist)
     # Rename for brevity
-            
+    A = imposeBoundaryConditionsStronglyOnMatrix(A, fixed)
+    bList = [imposeBoundaryConditionsStronglyOnVector(b, fixed) for b in bList]
+    B = imposeBoundaryConditionsStronglyOnInterpolation(B, fixed)
+
     # Compute Y
     #luA = sparse.linalg.splu(A)
-    #luA_approxpprox = sparse.linalg.spilu(A)
-    cholA = cholesky(A)
+    if False and cholCache is not None:
+        assert(NPatchCoarse is not None)
+        assert(NCoarseElement is not None)
+        N = NPatchCoarse*NCoarseElement
+        print A.shape
+        print A.nnz
+        cholA = cholCache.lookup(N, A)
+    else:
+        cholA = cholesky(A)
+
     Y = np.zeros((B.shape[1], B.shape[0]))
     for y, c in zip(Y.T, B):
         #y[:] = luA.solve(np.array(c.todense()).T.squeeze())
         #y[:] = luA_approx.solve(np.array(c.todense()).T.squeeze())
-        y[:] = cholA.solve_A(np.array(c.todense()).T.squeeze())
-                
+        y[:] = cholA.solve_A(c.T).todense().squeeze()
+
     S = B*Y
     invS = np.linalg.inv(S)
 
@@ -413,3 +495,28 @@ def schurComplementSolve(A, B, bList):
         correctorFree = q - np.dot(Y,lam)
         correctorFreeList.append(correctorFree)
     return correctorFreeList
+
+
+# Remove fized degrees of freedom from matrices A, B and b
+def imposeBoundaryConditionsStronglyOnMatrix(A, fixed):
+    AStrong = A.copy()
+    nzFixedCols = AStrong[:,fixed].nonzero()
+    AStrong[nzFixedCols[0],fixed[nzFixedCols[1]]] = 0
+    nzFixedRows = AStrong[fixed,:].nonzero()
+    AStrong[fixed[nzFixedRows[0]],nzFixedRows[1]] = 0
+    AStrong[fixed,fixed] = 1
+    return AStrong
+
+def imposeBoundaryConditionsStronglyOnVector(b, fixed):
+    bStrong = b.copy()
+    bStrong[fixed] = 0
+    return bStrong
+
+def imposeBoundaryConditionsStronglyOnInterpolation(B, fixed):
+    BStrong = B.copy()
+    nzFixedCols = BStrong[:,fixed].nonzero()
+    BStrong[nzFixedCols[0],fixed[nzFixedCols[1]]] = 0
+    BStrong.eliminate_zeros()
+    BStrong = BStrong[BStrong.getnnz(1)>0]
+    return BStrong
+

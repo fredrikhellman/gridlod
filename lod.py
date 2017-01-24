@@ -14,7 +14,8 @@ class nullspaceSolver:
         NPatchFine = NPatchCoarse*NCoarseElement
         self.coarseNodes = util.fillpIndexMap(NPatchCoarse, NPatchFine)
 
-    def solve(self, A, I, bList):
+    def solve(self, A, I, bList, fixed, NPatchCoarse=None, NCoarseElement=None):
+        raise(NotImplementedError('Not maintained'))
         return linalg.saddleNullSpace(A, I, bList, self.coarseNodes)
 
 class nullspaceOneLevelHierarchySolver:
@@ -26,8 +27,8 @@ class nullspaceOneLevelHierarchySolver:
         # solver of this kind can be implemented, but where PPatch is
         # implicitly defined instead...
         
-    def solve(self, A, I, bList):
-        return linalg.saddleNullSpaceHierarchicalBasis(A, I, self.PPatch, bList, self.coarseNodes)
+    def solve(self, A, I, bList, fixed, NPatchCoarse=None, NCoarseElement=None):
+        return linalg.saddleNullSpaceHierarchicalBasis(A, I, self.PPatch, bList, self.coarseNodes, fixed)
 
 class nullspaceSeveralLevelsHierarchySolver:
     def __init__(self, NPatchCoarse, NCoarseElement):
@@ -35,31 +36,43 @@ class nullspaceSeveralLevelsHierarchySolver:
         self.coarseNodes = util.fillpIndexMap(NPatchCoarse, NPatchFine)
         self.PHier = fem.assembleHierarchicalBasisMatrix(NPatchCoarse, NCoarseElement)
 
-    def solve(self, A, I, bList):
+    def solve(self, A, I, bList, fixed, NPatchCoarse=None, NCoarseElement=None):
+        raise(NotImplementedError('Not maintained'))
         return linalg.saddleNullSpaceGeneralBasis(A, I, self.PHier, bList, self.coarseNodes)
 
 class blockDiagonalPreconditionerSolver:
     def __init__(self):
         pass
     
-    def solve(self, A, I, bList):
+    def solve(self, A, I, bList, fixed, NPatchCoarse=None, NCoarseElement=None):
+        raise(NotImplementedError('Fix this!'))
         return linalg.solveWithBlockDiagonalPreconditioner(A, I, bList)
 
 class schurComplementSolver:
+    def __init__(self, NCache=None):
+        if NCache is not None:
+            self.cholCache = linalg.choleskyCache(NCache)
+        else:
+            self.cholCache = None
+    
+    def solve(self, A, I, bList, fixed, NPatchCoarse=None, NCoarseElement=None):
+        return linalg.schurComplementSolve(A, I, bList, fixed, NPatchCoarse, NCoarseElement, self.cholCache)
+
+class directSolver:
     def __init__(self):
         pass
     
-    def solve(self, A, I, bList):
-        return linalg.schurComplementSolve(A, I, bList)
-
+    def solve(self, A, I, bList, fixed, NPatchCoarse=None, NCoarseElement=None):
+        return linalg.saddleDirect(A, I, bList, fixed)
+    
 def ritzProjectionToFinePatch(NPatchCoarse,
                               NCoarseElement,
                               APatchFull,
                               bPatchFullList,
                               IPatch):
 
-    saddleSolver = nullspaceOneLevelHierarchySolver(NPatchCoarse, NCoarseElement)
-    #saddleSolver = schurComplementSolver()  # Fast for small patch problems
+    #saddleSolver = nullspaceOneLevelHierarchySolver(NPatchCoarse, NCoarseElement)
+    saddleSolver = schurComplementSolver()  # Fast for small patch problems
     
     return ritzProjectionToFinePatchWithGivenSaddleSolver(NPatchCoarse,
                                                           NCoarseElement,
@@ -79,6 +92,8 @@ def ritzProjectionToFinePatchWithGivenSaddleSolver(NPatchCoarse,
     NpFine = np.prod(NPatchFine+1)
 
     fixed = util.boundarypIndexMap(NPatchFine)
+    
+    '''
     def imposeBoundaryConditionsStronglyOnMatrix(A, fixed):
         AStrong = A.copy()
         nzFixedCols = AStrong[:,fixed].nonzero()
@@ -95,8 +110,11 @@ def ritzProjectionToFinePatchWithGivenSaddleSolver(NPatchCoarse,
 
     APatch = imposeBoundaryConditionsStronglyOnMatrix(APatchFull, fixed)
     bPatchList = [imposeBoundaryConditionsStronglyOnVector(bPatchFull, fixed) for bPatchFull in bPatchFullList]
+    '''
 
-    projectionsList = saddleSolver.solve(APatch, IPatch, bPatchList)
+    #projectionsList = saddleSolver.solve(APatch, IPatch, bPatchList)
+
+    projectionsList = saddleSolver.solve(APatchFull, IPatch, bPatchFullList, fixed, NPatchCoarse, NCoarseElement)
 
     return projectionsList
 
@@ -109,15 +127,17 @@ class elementCorrector:
         # Compute (NPatchCoarse, iElementPatchCoarse) from (k, iElementWorldCoarse, NWorldCoarse)
         d = np.size(iElementWorldCoarse)
         NWorldCoarse = world.NWorldCoarse
-        iPatchWorldCoarse = np.maximum(0, iElementWorldCoarse - k)
-        iEndPatchWorldCoarse = np.minimum(NWorldCoarse - 1, iElementWorldCoarse + k) + 1
+        iPatchWorldCoarse = np.maximum(0, iElementWorldCoarse - k).astype('int64')
+        iEndPatchWorldCoarse = np.minimum(NWorldCoarse - 1, iElementWorldCoarse + k).astype('int64') + 1
         self.NPatchCoarse = iEndPatchWorldCoarse-iPatchWorldCoarse
         self.iElementPatchCoarse = iElementWorldCoarse - iPatchWorldCoarse
         self.iPatchWorldCoarse = iPatchWorldCoarse
 
         if saddleSolver == None:
-            self._saddleSolver = nullspaceOneLevelHierarchySolver(self.NPatchCoarse,
-                                                                  world.NCoarseElement)
+#            self._saddleSolver = nullspaceOneLevelHierarchySolver(self.NPatchCoarse,
+#                                                                  world.NCoarseElement)
+            self._saddleSolver = schurComplementSolver()
+#            self._saddleSolver = directSolver()
         else:
             self._saddleSolver = saddleSolver
             
@@ -165,8 +185,7 @@ class elementCorrector:
         
         assert(np.size(aPatch) == NtFine)
 
-        ALoc = world.ALoc
-        MLoc = world.MLoc
+        ALocFine = world.ALocFine
 
         iElementPatchCoarse = self.iElementPatchCoarse
         
@@ -179,8 +198,8 @@ class elementCorrector:
                                                        iElementPatchCoarse,
                                                        extractElements=False)
 
-        AElementFull = fem.assemblePatchMatrix(NCoarseElement, ALoc, aPatch[elementFinetIndexMap])
-        APatchFull = fem.assemblePatchMatrix(NPatchFine, ALoc, aPatch)
+        AElementFull = fem.assemblePatchMatrix(NCoarseElement, ALocFine, aPatch[elementFinetIndexMap])
+        APatchFull = fem.assemblePatchMatrix(NPatchFine, ALocFine, aPatch)
         
         bPatchFullList = []
         localBasis = world.localBasis
@@ -189,12 +208,13 @@ class elementCorrector:
             bPatchFull[elementFinepIndexMap] = AElementFull*phi
             bPatchFullList.append(bPatchFull)
 
-            correctorsList = ritzProjectionToFinePatchWithGivenSaddleSolver(NPatchCoarse,
-                                                                            NCoarseElement,
-                                                                            APatchFull,
-                                                                            bPatchFullList,
-                                                                            IPatch,
-                                                                            self.saddleSolver)
+        correctorsList = ritzProjectionToFinePatchWithGivenSaddleSolver(NPatchCoarse,
+                                                                        NCoarseElement,
+                                                                        APatchFull,
+                                                                        bPatchFullList,
+                                                                        IPatch,
+                                                                        self.saddleSolver)
+        
         self.fsi = self.FineScaleInformation(coefficientPatch, correctorsList)
         
     def computeCoarseQuantities(self):
@@ -227,7 +247,7 @@ class elementCorrector:
         correctorsList = self.fsi.correctorsList
         aPatch = self.fsi.coefficient.aFine
 
-        ALoc = world.ALoc
+        ALocFine = world.ALocFine
         localBasis = world.localBasis
 
         TPrimeCoarsepStartIndices = util.lowerLeftpIndexMap(NPatchCoarse-1, NPatchCoarse)
@@ -253,7 +273,7 @@ class elementCorrector:
                     TPrimeFinetStartIndices,
                     TPrimeFinepStartIndices):
             
-            KTPrime = fem.assemblePatchMatrix(NCoarseElement, ALoc, aPatch[TPrimeFinetStartIndex +
+            KTPrime = fem.assemblePatchMatrix(NCoarseElement, ALocFine, aPatch[TPrimeFinetStartIndex +
                                                                            TPrimeFinetIndexMap])
             P = localBasis
             Q = np.column_stack([corrector[TPrimeFinepStartIndex + TPrimeFinepIndexMap] for corrector in correctorsList])

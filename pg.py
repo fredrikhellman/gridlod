@@ -6,15 +6,16 @@ import util
 
 
 class PetrovGalerkinLOD:
-    def __init__(self, world, k, IPatchGenerator, epsilonTol):
+    def __init__(self, world, k, IPatchGenerator, epsilonTol, printLevel=0):
         self.world = world
         NtCoarse = np.prod(world.NWorldCoarse)
         self.ecList = [None]*NtCoarse
         self.k = k
         self.IPatchGenerator = IPatchGenerator
         self.epsilonTol = epsilonTol
+        self.printLevel = printLevel
 
-    def updateCorrectors(self, coefficient):
+    def updateCorrectors(self, coefficient, clearFineQuantities=True):
         world = self.world
         k = self.k
         IPatchGenerator = self.IPatchGenerator
@@ -22,28 +23,79 @@ class PetrovGalerkinLOD:
         
         NtCoarse = np.prod(world.NWorldCoarse)
 
+        saddleSolver = lod.schurComplementSolver(world.NWorldCoarse*world.NCoarseElement)
+        
         ecList = self.ecList
         for TInd in range(NtCoarse):
+            if self.printLevel > 0:
+                print str(TInd) + ' / ' + str(NtCoarse)
             iElement = util.convertpIndexToCoordinate(world.NWorldCoarse-1, TInd)
             if ecList[TInd] is not None  and  hasattr(coefficient, 'rCoarse'):
-                epsilonT = ecList[TInd].computeError(coefficient.rCoarse)
+                ecT = ecList[TInd]
+                coefficientPatch = coefficient.localize(ecT.iPatchWorldCoarse, ecT.NPatchCoarse)
+                epsilonT = ecList[TInd].computeErrorIndicator(coefficientPatch.rCoarse)
             else:
+                coefficientPatch = None
                 epsilonT = np.inf
 
+            print epsilonT
+                
             if epsilonT > epsilonTol:
-                ecT = lod.elementCorrector(world, k, iElement)
+                ecT = lod.elementCorrector(world, k, iElement, saddleSolver)
 
-                coefficientPatch = coefficient.localize(ecT.iPatchWorldCoarse, ecT.NPatchCoarse)
+                if coefficientPatch is None:
+                    coefficientPatch = coefficient.localize(ecT.iPatchWorldCoarse, ecT.NPatchCoarse)
                 IPatch = IPatchGenerator(ecT.iPatchWorldCoarse, ecT.NPatchCoarse)
                 
                 ecT.computeCorrectors(coefficientPatch, IPatch)
                 ecT.computeCoarseQuantities()
-                ecT.clearFineQuantities()
+                if clearFineQuantities:
+                    ecT.clearFineQuantities()
                 ecList[TInd] = ecT
                 
     def clearCorrectors(self):
         NtCoarse = np.prod(self.world.NWorldCoarse)
         self.ecList = [None]*NtCoarse
+
+    def assembleBasisCorrectors(self):
+        world = self.world
+        NWorldCoarse = world.NWorldCoarse
+        NCoarseElement = world.NCoarseElement
+        NWorldFine = NWorldCoarse*NCoarseElement
+        
+        NtCoarse = np.prod(NWorldCoarse)
+        NpCoarse = np.prod(NWorldCoarse+1)
+        NpFine = np.prod(NWorldFine+1)
+        
+        TpIndexMap = util.lowerLeftpIndexMap(np.ones_like(NWorldCoarse), NWorldCoarse)
+        TpStartIndices = util.lowerLeftpIndexMap(NWorldCoarse-1, NWorldCoarse)
+        
+        cols = []
+        rows = []
+        data = []
+        ecList = self.ecList
+        for TInd in range(NtCoarse):
+            ecT = ecList[TInd]
+            assert(ecT is not None)
+            assert(hasattr(ecT, 'fsi'))
+
+            NPatchFine = ecT.NPatchCoarse*NCoarseElement
+            iPatchWorldFine = ecT.iPatchWorldCoarse*NCoarseElement
+            
+            patchpIndexMap = util.lowerLeftpIndexMap(NPatchFine, NWorldFine)
+            patchpStartIndex = util.convertpCoordinateToIndex(NWorldFine, iPatchWorldFine)
+            
+            colsT = TpStartIndices[TInd] + TpIndexMap
+            rowsT = patchpStartIndex + patchpIndexMap
+            dataT = np.hstack(ecT.fsi.correctorsList)
+
+            cols.extend(np.repeat(colsT, np.size(rowsT)))
+            rows.extend(np.tile(rowsT, np.size(colsT)))
+            data.extend(dataT)
+
+        basisCorrectors = sparse.csc_matrix((data, (rows, cols)), shape=(NpFine, NpCoarse))
+        
+        return basisCorrectors
         
     def assembleStiffnessMatrix(self):
         world = self.world
@@ -72,8 +124,8 @@ class PetrovGalerkinLOD:
             rowsT = patchpStartIndex + patchpIndexMap
             dataT = ecT.csi.Kij.flatten()
 
-            cols.extend(np.repeat(colsT, np.size(rowsT)))
-            rows.extend(np.tile(rowsT, np.size(colsT)))
+            cols.extend(np.tile(colsT, np.size(rowsT)))
+            rows.extend(np.repeat(rowsT, np.size(colsT)))
             data.extend(dataT)
 
         K = sparse.csc_matrix((data, (rows, cols)), shape=(NpCoarse, NpCoarse))
