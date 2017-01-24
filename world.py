@@ -7,8 +7,8 @@ class World:
         d = np.size(NWorldCoarse)
         assert(np.size(NCoarseElement) == d)
         if boundaryConditions is None:
-            boundaryConditions = np.zeros(2*d, dtype='int64')
-        assert(np.size(boundaryConditions) == 2*d)
+            boundaryConditions = np.zeros([d,2], dtype='int64')
+        assert(boundaryConditions.shape == (d,2))
 
         self.NWorldCoarse = NWorldCoarse
         self.NCoarseElement = NCoarseElement

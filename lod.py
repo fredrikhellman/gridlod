@@ -2,6 +2,7 @@ import numpy as np
 import scipy.sparse as sparse
 import scipy.sparse.linalg
 import gc
+import warnings
 
 import fem
 import util
@@ -94,7 +95,23 @@ def ritzProjectionToFinePatchWithGivenSaddleSolver(world,
     NPatchFine = NPatchCoarse*world.NCoarseElement
     NpFine = np.prod(NPatchFine+1)
 
-    fixed = util.boundarypIndexMap(NPatchFine)
+    # Find what patch faces are common to the world faces, and inherit
+    # boundary conditions from the world for those. For the other
+    # faces, all DoFs fixed (Dirichlet)
+    boundaryMapWorld = world.boundaryConditions==0
+
+    inherit0 = iPatchWorldCoarse==0
+    inherit1 = (iPatchWorldCoarse+NPatchCoarse)==world.NWorldCoarse
+    
+    boundaryMap = np.ones([d, 2], dtype='bool')
+    boundaryMap[inherit0,0] = boundaryMapWorld[inherit0,0]
+    boundaryMap[inherit1,1] = boundaryMapWorld[inherit1,1]
+
+    # Using schur complement solver for the case when there are no
+    # Dirichlet conditions does not work. Fix if necessary.
+    assert(np.any(boundaryMap == True))
+    
+    fixed = util.boundarypIndexMap(NPatchFine, boundaryMap)
     
     '''
     def imposeBoundaryConditionsStronglyOnMatrix(A, fixed):

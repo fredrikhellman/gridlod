@@ -3,6 +3,8 @@ import numpy as np
 import scipy.sparse as sparse
 import os
 
+from pyevtk.hl import imageToVTK 
+
 import pg
 from world import World
 import interp
@@ -141,44 +143,59 @@ class PetrovGalerkinLOD_TestCase(unittest.TestCase):
         NWorldCoarse = np.array([6, 22, 5])
         NCoarseElement = NWorldFine/NWorldCoarse
         NtCoarse = np.prod(NWorldCoarse)
+        NpCoarse = np.prod(NWorldCoarse+1)
         
-        world = World(NWorldCoarse, NCoarseElement)
-
+        boundaryConditions = np.array([[1, 1],
+                                       [1, 1],
+                                       [1, 1]])
+        world = World(NWorldCoarse, NCoarseElement, boundaryConditions)
+        
         aBase = np.loadtxt(os.path.dirname(os.path.realpath(__file__)) + '/data/upperness_x.txt')
         #aBase = aBase[::8]
         rCoarse = np.ones(NtCoarse)
         
         self.assertTrue(np.size(aBase) == NtFine)
 
-        if False:
+        if True:
             IPatchGenerator = lambda i, N: interp.L2ProjectionPatchMatrix(i, N, NWorldCoarse, NCoarseElement)
             aCoef = coef.coefficientCoarseFactor(NWorldCoarse, NCoarseElement, aBase, rCoarse)
         
-            k = 1
+            k = 0
             printLevel = 1
             pglod = pg.PetrovGalerkinLOD(world, k, IPatchGenerator, 1e-1, printLevel)
             pglod.updateCorrectors(aCoef, clearFineQuantities=True)
 
-            rCoarse2 = np.array(rCoarse)
-            rCoarse2[10] = 1.2
-            aCoef2 = coef.coefficientCoarseFactor(NWorldCoarse, NCoarseElement, aBase, rCoarse2)
-            pglod.updateCorrectors(aCoef2, clearFineQuantities=True)
+            KFull = pglod.assembleStiffnessMatrix()
+            MFull = fem.assemblePatchMatrix(NWorldCoarse, world.MLocCoarse)
 
-        
-        # KFull = pglod.assembleStiffnessMatrix()
-        # MFull = fem.assemblePatchMatrix(NWorldCoarse, world.MLocCoarse)
+            f = np.zeros(NpCoarse)
+            f[0] = 1
+            f[-1] = -1
+            
+            free = np.arange(0,NpCoarse)
+            bFull = MFull*f
 
-        # free  = util.interiorpIndexMap(NWorldCoarse)
+            KFree = KFull[free][:,free]
+            bFree = bFull[free]
 
-        # f = np.ones(NpCoarse)
-        # bFull = MFull*f
+            xFree = sparse.linalg.spsolve(KFree, bFree)
 
-        # KFree = KFull[free][:,free]
-        # bFree = bFull[free]
+            uCoarse = np.zeros(NpCoarse)
+            uCoarse[free] = xFree
+            uCoarse[0] = 0
+            uCoarse[-1] = 0
+            uCube = np.reshape(uCoarse, (NWorldCoarse+1)[::-1])
+            uCube = np.ascontiguousarray(np.transpose(uCube, axes=[2, 1, 0]))
+            
+            imageToVTK("./image", pointData = {"u" : uCube} )
 
-        
-        # xFree = sparse.linalg.spsolve(KFree, bFree)
-
+        if False:
+            coord = util.pCoordinates(NWorldCoarse)
+            uCoarse = coord[:,1].flatten()
+            uCube = np.reshape(uCoarse, (NWorldCoarse+1)[::-1])
+            uCube = np.ascontiguousarray(np.transpose(uCube, axes=[2, 1, 0]))
+            imageToVTK("./image", pointData = {"u" : uCube} )
+            
         # basis = fem.assembleProlongationMatrix(NWorldCoarse, NCoarseElement)
         # basisCorrectors = pglod.assembleBasisCorrectors()
         # modifiedBasis = basis - basisCorrectors
@@ -187,17 +204,17 @@ class PetrovGalerkinLOD_TestCase(unittest.TestCase):
         # uLodCoarse = basis*xFull
         # uLodFine = modifiedBasis*xFull
 
-        freeFine  = util.interiorpIndexMap(NWorldFine)
-        AFine = fem.assemblePatchMatrix(NWorldFine, world.ALocFine, aBase)
-        MFine = fem.assemblePatchMatrix(NWorldFine, world.MLocFine)
-        bFine = MFine*np.ones(NpFine)
-        AFineFree = AFine[freeFine][:,freeFine]
-        bFineFree = bFine[freeFine]
-        uFineFree = linalg.linSolve(AFine, bFine)
-        uFineFull = np.zeros(NpFine)
-        uFineFull[freeFine] = uFineFree
+        #freeFine  = util.interiorpIndexMap(NWorldFine)
+        #AFine = fem.assemblePatchMatrix(NWorldFine, world.ALocFine, aBase)
+        #MFine = fem.assemblePatchMatrix(NWorldFine, world.MLocFine)
+        #bFine = MFine*np.ones(NpFine)
+        #AFineFree = AFine[freeFine][:,freeFine]
+        #bFineFree = bFine[freeFine]
+        #uFineFree = linalg.linSolve(AFine, bFine)
+        #uFineFull = np.zeros(NpFine)
+        #uFineFull[freeFine] = uFineFree
 
-        np.savetxt('uFineFull', uFineFull)
+        #np.savetxt('uFineFull', uFineFull)
         
 if __name__ == '__main__':
     import cProfile
