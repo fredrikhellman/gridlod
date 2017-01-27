@@ -37,13 +37,17 @@ def L2ProjectionCoarseElementMatrix(NCoarseElement):
     I = sparse.coo_matrix(IDense)
     return I
 
-def L2ProjectionPatchMatrix(iPatchCoarse, NPatchCoarse, NWorldCoarse, NCoarseElement):
+def L2ProjectionPatchMatrix(iPatchCoarse, NPatchCoarse, NWorldCoarse, NCoarseElement, boundaryConditions=None):
     NPatchFine = NPatchCoarse*NCoarseElement
     
     IElement = L2ProjectionCoarseElementMatrix(NCoarseElement)
     IPatch = assemblePatchInterpolationMatrix(IElement, NPatchFine, NCoarseElement)
     AvgPatch = assemblePatchNodeAveragingMatrix(iPatchCoarse, NPatchCoarse, NWorldCoarse)
     IL2ProjectionPatch = AvgPatch*IPatch
+    if boundaryConditions is not None:
+        BcPatch = assemblePatchBoundaryConditionMatrix(iPatchCoarse, NPatchCoarse, NWorldCoarse, boundaryConditions)
+        IL2ProjectionPatch = BcPatch*IL2ProjectionPatch
+        
     return IL2ProjectionPatch
 
 def uncoupledL2ProjectionCoarseElementMatrix(NCoarseElement):
@@ -132,3 +136,25 @@ def assemblePatchNodeAveragingMatrix(iPatchCoarse, NPatchCoarse, NWorldCoarse):
     numNeighbors = util.numNeighboringElements(iPatchCoarse, NPatchCoarse, NWorldCoarse)
     return sparse.dia_matrix((1./numNeighbors, 0), shape=(Np, Np))
     
+def assemblePatchBoundaryConditionMatrix(iPatchCoarse, NPatchCoarse, NWorldCoarse, boundaryConditions):
+    Np = np.prod(NPatchCoarse+1)
+    d = np.size(NPatchCoarse)
+    
+    diag = np.ones(Np)
+
+    # Find what patch faces are common to the world faces, and inherit
+    # boundary conditions from the world for those. For the other
+    # faces, all DoFs free.
+    boundaryMapWorld = boundaryConditions==0
+
+    inherit0 = iPatchCoarse==0
+    inherit1 = (iPatchCoarse+NPatchCoarse)==NWorldCoarse
+    
+    boundaryMap = np.zeros([d, 2], dtype='bool')
+    boundaryMap[inherit0,0] = boundaryMapWorld[inherit0,0]
+    boundaryMap[inherit1,1] = boundaryMapWorld[inherit1,1]
+
+    fixed = util.boundarypIndexMap(NPatchCoarse, boundaryMap)
+    diag[fixed] = 0
+
+    return sparse.dia_matrix((diag, 0), shape=(Np, Np))

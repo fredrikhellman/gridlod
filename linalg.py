@@ -13,10 +13,8 @@ def linSolve(K, c):
         linSolver = 'spsolve'
 
     if linSolver == 'spsolve':
-        print 'Using spsolve'
         x = sparse.linalg.spsolve(K, c)
     elif linSolver == 'cg':
-        print 'Using CG'
         DHalfInvDiag = 1./np.sqrt(K.diagonal())
         DHalfInv = sparse.diags([DHalfInvDiag], offsets=[0])
         B = DHalfInv*(K*DHalfInv)
@@ -26,10 +24,8 @@ def linSolve(K, c):
             print np.linalg.norm(B*xk-d)
         
         y, info = sparse.linalg.minres(B, d, callback=cgCallback)
-        print 'info = {}'.format(info)
         x = DHalfInv*y
     elif linSolver == 'cholesky':
-        print 'Using cholesky'
         cholK = cholesky(K)
         x = cholK.solve_A(c)
     return x

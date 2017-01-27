@@ -13,7 +13,7 @@ import util
 import fem
 import linalg
 
-def solveReference(world, aFine, MbFine, AbFine, boundaoryConditions):
+def solveReference(world, aFine, MbFine, AbFine, boundaryConditions):
 
     NWorldCoarse = world.NWorldCoarse
     NWorldFine = world.NWorldCoarse*world.NCoarseElement
@@ -25,7 +25,7 @@ def solveReference(world, aFine, MbFine, AbFine, boundaoryConditions):
     if AbFine is None:
         AbFine = np.zeros(NpFine)
         
-    boundaryMap = boundaoryConditions==0
+    boundaryMap = boundaryConditions==0
     fixedFine = util.boundarypIndexMap(NWorldFine, boundaryMap=boundaryMap)
     freeFine  = np.setdiff1d(np.arange(NpFine), fixedFine)
     AFine = fem.assemblePatchMatrix(NWorldFine, world.ALocFine, aFine)
@@ -243,59 +243,46 @@ class PetrovGalerkinLOD_TestCase(unittest.TestCase):
         errorFine = np.sqrt(np.dot(uFineFull - uLodFine, AFine*(uFineFull - uLodFine)))
         print errorFine
         
-    def test_2d_computeCoarseFlux(self):
-        return
-        NWorldFine = np.array([60, 60])
+    def test_2d_exactSolution(self):
+        NWorldFine = np.array([30, 40])
         NpFine = np.prod(NWorldFine+1)
         NtFine = np.prod(NWorldFine)
-        NWorldCoarse = np.array([3, 3])
+        NWorldCoarse = np.array([3, 4])
         NCoarseElement = NWorldFine/NWorldCoarse
         NtCoarse = np.prod(NWorldCoarse)
         NpCoarse = np.prod(NWorldCoarse+1)
         
-        boundaryConditions = np.array([[0, 0],
-                                       [0, 0]])
+        boundaryConditions = np.array([[1, 0],
+                                       [0, 1]])
         world = World(NWorldCoarse, NCoarseElement, boundaryConditions)
 
         np.random.seed(0)
         
-        aBaseSquare = 1.+0*np.exp(5*np.random.random_sample(NWorldFine[0]))
+        aBaseSquare = np.exp(5*np.random.random_sample(NWorldFine[0]))
         aBaseCube = np.tile(aBaseSquare, [NWorldFine[1],1])
         aBaseCube = aBaseCube[...,np.newaxis]
-        imageToVTK("./aBase", pointData = {"a" : aBaseCube} )
 
-        print aBaseCube.shape
         aBase = aBaseCube.flatten()
 
-        print aBase[0], aBase[1]
-        self.assertTrue(np.size(aBase) == NtFine)
-
-        IPatchGenerator = lambda i, N: interp.L2ProjectionPatchMatrix(i, N, NWorldCoarse, NCoarseElement)
+        IPatchGenerator = lambda i, N: interp.L2ProjectionPatchMatrix(i, N, NWorldCoarse, NCoarseElement, boundaryConditions)
         IWorld = IPatchGenerator(0*NWorldCoarse, NWorldCoarse)
         
         aCoef = coef.coefficientFine(NWorldCoarse, NCoarseElement, aBase)
         
-        k = 2
-        printLevel = 1
+        k = 4
+        printLevel = 0
         pglod = pg.PetrovGalerkinLOD(world, k, IPatchGenerator, 0, printLevel)
         pglod.updateCorrectors(aCoef, clearFineQuantities=False)
 
         KmsFull = pglod.assembleMsStiffnessMatrix()
-        KFull   = pglod.assembleStiffnessMatrix()
-        MFull   = fem.assemblePatchMatrix(NWorldCoarse, world.MLocCoarse)
-
-        MGammaLocGetter = fem.localBoundaryMassMatrixGetter(NWorldCoarse)
-        boundaryMap = boundaryConditions==0
-        MGammaFull = fem.assemblePatchBoundaryMatrix(NWorldCoarse, MGammaLocGetter, boundaryMap=boundaryMap)
         
         coords = util.pCoordinates(NWorldCoarse)
         xC = coords[:,0]
         yC = coords[:,1]
-        g = 3*xC**2 - (1-yC)**2
+        g = xC**2 - (1-yC)**2
         bFull = -KmsFull*g
 
-        print bFull
-        
+        boundaryMap = boundaryConditions==0
         fixed = util.boundarypIndexMap(NWorldCoarse, boundaryMap)
         free = np.setdiff1d(np.arange(0,NpCoarse), fixed)
         KmsFree = KmsFull[free][:,free]
@@ -309,66 +296,16 @@ class PetrovGalerkinLOD_TestCase(unittest.TestCase):
 
         xFull = np.zeros(NpCoarse)
         xFull[free] = xFree
-        uLodCoarse = basis*(xFull + g)
         uLodFine = modifiedBasis*(xFull + g)
 
-        print np.max(np.abs((IWorld*basis).todense()-np.eye(NpCoarse)))
-        
-        uCube = bFull.reshape(NWorldCoarse+1, order='F')
-        uCube = uCube[...,np.newaxis]
-        uCube = np.ascontiguousarray(uCube)
-        imageToVTK("./imagebFull", pointData = {"u" : uCube} )
-
-        uCube = uLodFine.reshape(NWorldFine+1, order='F')
-        uCube = uCube[...,np.newaxis]
-        uCube = np.ascontiguousarray(uCube)
-        imageToVTK("./imageLod", pointData = {"u" : uCube} )
-
-        uCube = uLodCoarse.reshape(NWorldFine+1, order='F')
-        uCube = uCube[...,np.newaxis]
-        uCube = np.ascontiguousarray(uCube)
-        imageToVTK("./imageCoarse", pointData = {"u" : uCube} )
-        
         gFine = basis*g
         uFineFull, AFine, MFine = solveReference(world, aBase, None, -gFine, boundaryConditions)
         uFineFull += gFine
 
-        KmsRef = np.dot(basis.T, AFine*modifiedBasis)
-        print np.where(np.abs(KmsRef.todense()-KmsFull.todense()) < 1e-12)[0]
-        print np.where(np.abs(KmsRef.todense()-KmsFull.todense()) < 1e-12)[1]
-        
-        uCubeFine = gFine.reshape(NWorldFine+1, order='F')
-        uCubeFine = uCubeFine[...,np.newaxis]
-        uCubeFine = np.ascontiguousarray(uCubeFine)
-        imageToVTK("./g", pointData = {"u" : uCubeFine} )
-
-        uCubeFine = uFineFull.reshape(NWorldFine+1, order='F')
-        uCubeFine = uCubeFine[...,np.newaxis]
-        uCubeFine = np.ascontiguousarray(uCubeFine)
-        imageToVTK("./imageFine", pointData = {"u" : uCubeFine} )
-
-        uCubeFine = (uFineFull-uLodFine).reshape(NWorldFine+1, order='F')
-        uCubeFine = uCubeFine[...,np.newaxis]
-        uCubeFine = np.ascontiguousarray(uCubeFine)
-        imageToVTK("./diff", pointData = {"u" : uCubeFine} )
-
-        pointData = dict()
-        for i, corrector in zip(np.arange(basisCorrectors.shape[1]), basisCorrectors.todense().T):
-            uCubeFine = corrector.reshape(NWorldFine+1, order='F')
-            uCubeFine = uCubeFine[...,np.newaxis]
-            uCubeFine = np.ascontiguousarray(uCubeFine)
-            pointData["c"+str(i)] = uCubeFine
-        imageToVTK("./correctors", pointData = pointData )
-        
         errorFineA = np.sqrt(np.dot(uFineFull - uLodFine, AFine*(uFineFull - uLodFine)))
-        errorCoarseA = np.sqrt(np.dot(uFineFull - uLodCoarse, AFine*(uFineFull - uLodCoarse)))
         errorFineM = np.sqrt(np.dot(uFineFull - uLodFine, MFine*(uFineFull - uLodFine)))
-        errorCoarseM = np.sqrt(np.dot(uFineFull - uLodCoarse, MFine*(uFineFull - uLodCoarse)))
-        print 'Error fine', errorFineA, errorFineM
-        print 'Error coarse', errorCoarseA, errorCoarseM
-
-        print np.reshape(IWorld*(uFineFull-uLodFine), NWorldCoarse+1)
-        return
+        self.assertTrue(np.isclose(errorFineA, 0))
+        self.assertTrue(np.isclose(errorFineM, 0))
 
     def test_2d_parallelChannels(self):
         return
