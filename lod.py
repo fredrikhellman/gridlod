@@ -167,8 +167,9 @@ class elementCorrector:
             self.correctorsList = correctorsList
 
     class CoarseScaleInformation:
-        def __init__(self, Kij, muTPrime, rCoarse=None):
+        def __init__(self, Kij, Kmsij, muTPrime, rCoarse=None):
             self.Kij = Kij
+            self.Kmsij = Kmsij
             #self.LTPrimeij = LTPrimeij
             self.muTPrime = muTPrime
             self.rCoarse = rCoarse
@@ -243,7 +244,8 @@ class elementCorrector:
 
         Compute the tensors (T is given by the class instance):
 
-        KTij   = (A \nabla (lambda_j - Q_T lambda_j), \nabla lambda_i)_{U_k(T)}
+        KTij   = (A \nabla lambda_j, \nabla lambda_i)_{T}
+        KmsTij = (A \nabla (lambda_j - Q_T lambda_j), \nabla lambda_i)_{U_k(T)}
         muTT'  = max_{w_H} || A \nabla (\chi_T - Q_T) w_H ||^2_T' / || A \nabla w_H ||^2_T
 
         and store them in the self.csi object. See
@@ -283,7 +285,7 @@ class elementCorrector:
         TInd = util.convertpCoordinateToIndex(NPatchCoarse-1, self.iElementPatchCoarse)
         
         # This loop can probably be done faster than this. If a bottle-neck, fix!
-        Kij = np.zeros((NpPatchCoarse, 2**d))
+        Kmsij = np.zeros((NpPatchCoarse, 2**d))
         LTPrimeij = np.zeros((NTPrime, 2**d, 2**d))
         for (TPrimeInd, 
              TPrimeCoarsepStartIndex, 
@@ -298,31 +300,31 @@ class elementCorrector:
                                                                            TPrimeFinetIndexMap])
             P = localBasis
             Q = np.column_stack([corrector[TPrimeFinepStartIndex + TPrimeFinepIndexMap] for corrector in correctorsList])
-            BTPrimeij = np.dot(Q.T, KTPrime*P)
+            BTPrimeij = np.dot(P.T, KTPrime*Q)
             CTPrimeij = np.dot(Q.T, KTPrime*Q)
             sigma = TPrimeCoarsepStartIndex + TPrimeCoarsepIndexMap
             if TPrimeInd == TInd:
-                Aij = np.dot(P.T, KTPrime*P)
+                Kij = np.dot(P.T, KTPrime*P)
                 LTPrimeij[TPrimeInd] = CTPrimeij \
                                        - BTPrimeij \
                                        - BTPrimeij.T \
-                                       + Aij
-                Kij[sigma,:] += Aij - BTPrimeij
+                                       + Kij
+                Kmsij[sigma,:] += Kij - BTPrimeij
             else:
                 LTPrimeij[TPrimeInd] = CTPrimeij
-                Kij[sigma,:] += -BTPrimeij
+                Kmsij[sigma,:] += -BTPrimeij
 
         muTPrime = np.zeros(NTPrime)
         for TPrimeInd in np.arange(NTPrime):
             # Solve eigenvalue problem LTPrimeij x = mu_TPrime Mij x
-            eigenvalues = scipy.linalg.eigvals(LTPrimeij[TPrimeInd][:-1,:-1], Aij[:-1,:-1])
+            eigenvalues = scipy.linalg.eigvals(LTPrimeij[TPrimeInd][:-1,:-1], Kij[:-1,:-1])
             muTPrime[TPrimeInd] = np.max(np.real(eigenvalues))
 
         if isinstance(self.fsi.coefficient, coef.coefficientCoarseFactorAbstract):
             rCoarse = self.fsi.coefficient.rCoarse
         else:
             rCoarse = None
-        self.csi = self.CoarseScaleInformation(Kij, muTPrime, rCoarse)
+        self.csi = self.CoarseScaleInformation(Kij, Kmsij, muTPrime, rCoarse)
 
     def clearFineQuantities(self):
         assert(hasattr(self, 'fsi'))

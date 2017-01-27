@@ -28,7 +28,7 @@ class PetrovGalerkinLOD:
         ecList = self.ecList
         for TInd in range(NtCoarse):
             if self.printLevel > 0:
-                print str(TInd) + ' / ' + str(NtCoarse)
+                print str(TInd) + ' / ' + str(NtCoarse),
             iElement = util.convertpIndexToCoordinate(world.NWorldCoarse-1, TInd)
             if ecList[TInd] is not None  and  hasattr(coefficient, 'rCoarse'):
                 ecT = ecList[TInd]
@@ -37,8 +37,9 @@ class PetrovGalerkinLOD:
             else:
                 coefficientPatch = None
                 epsilonT = np.inf
-
-            print epsilonT
+            
+            if self.printLevel > 0:
+                print 'epsilonT = ' + str(epsilonT)
                 
             if epsilonT > epsilonTol:
                 ecT = lod.elementCorrector(world, k, iElement, saddleSolver)
@@ -97,7 +98,7 @@ class PetrovGalerkinLOD:
         
         return basisCorrectors
         
-    def assembleStiffnessMatrix(self):
+    def assembleMsStiffnessMatrix(self):
         world = self.world
         NWorldCoarse = world.NWorldCoarse
         
@@ -122,6 +123,38 @@ class PetrovGalerkinLOD:
             
             colsT = TpStartIndices[TInd] + TpIndexMap
             rowsT = patchpStartIndex + patchpIndexMap
+            dataT = ecT.csi.Kmsij.flatten()
+
+            cols.extend(np.tile(colsT, np.size(rowsT)))
+            rows.extend(np.repeat(rowsT, np.size(colsT)))
+            data.extend(dataT)
+
+        Kms = sparse.csc_matrix((data, (rows, cols)), shape=(NpCoarse, NpCoarse))
+        
+        return Kms
+
+    def assembleStiffnessMatrix(self):
+        world = self.world
+        NWorldCoarse = world.NWorldCoarse
+        
+        NtCoarse = np.prod(world.NWorldCoarse)
+        NpCoarse = np.prod(world.NWorldCoarse+1)
+        
+        TpIndexMap = util.lowerLeftpIndexMap(np.ones_like(NWorldCoarse), NWorldCoarse)
+        TpStartIndices = util.lowerLeftpIndexMap(NWorldCoarse-1, NWorldCoarse)
+
+        cols = []
+        rows = []
+        data = []
+        ecList = self.ecList
+        for TInd in range(NtCoarse):
+            ecT = ecList[TInd]
+            assert(ecT is not None)
+
+            NPatchCoarse = ecT.NPatchCoarse
+
+            colsT = TpStartIndices[TInd] + TpIndexMap
+            rowsT = TpStartIndices[TInd] + TpIndexMap
             dataT = ecT.csi.Kij.flatten()
 
             cols.extend(np.tile(colsT, np.size(rowsT)))
@@ -131,3 +164,4 @@ class PetrovGalerkinLOD:
         K = sparse.csc_matrix((data, (rows, cols)), shape=(NpCoarse, NpCoarse))
         
         return K
+    

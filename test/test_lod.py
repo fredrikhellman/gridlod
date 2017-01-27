@@ -115,6 +115,52 @@ class corrector_TestCase(unittest.TestCase):
         self.assertTrue(np.all(ec.iElementPatchCoarse == [1, 1]))
         self.assertTrue(np.all(ec.iPatchWorldCoarse == [0, 1]))
         
+    def test_testCsi(self):
+        NWorldCoarse = np.array([4, 5, 6])
+        NCoarseElement = np.array([5, 2, 3])
+        world = World(NWorldCoarse, NCoarseElement)
+        d = np.size(NWorldCoarse)
+        
+        k = 1
+        iElementWorldCoarse = np.array([2, 1, 2])
+        ec = lod.elementCorrector(world, k, iElementWorldCoarse)
+        IPatch = interp.L2ProjectionPatchMatrix(ec.iPatchWorldCoarse, ec.NPatchCoarse, NWorldCoarse, NCoarseElement)
+
+        NtPatch = np.prod(ec.NPatchCoarse*NCoarseElement)
+
+        np.random.seed(1)
+
+        aPatch = np.random.rand(NtPatch)
+        coefficientPatch = coef.coefficientFine(ec.NPatchCoarse, NCoarseElement, aPatch)
+        ec.computeCorrectors(coefficientPatch, IPatch)
+        ec.computeCoarseQuantities()
+
+        TFinetIndexMap   = util.extractElementFine(ec.NPatchCoarse,
+                                                   NCoarseElement,
+                                                   ec.iElementPatchCoarse,
+                                                   extractElements=True)
+        TFinepIndexMap   = util.extractElementFine(ec.NPatchCoarse,
+                                                   NCoarseElement,
+                                                   ec.iElementPatchCoarse,
+                                                   extractElements=False)
+        TCoarsepIndexMap   = util.extractElementFine(ec.NPatchCoarse,
+                                                     np.ones_like(NCoarseElement),
+                                                     ec.iElementPatchCoarse,
+                                                     extractElements=False)
+
+        APatchFine      = fem.assemblePatchMatrix(ec.NPatchCoarse*NCoarseElement, world.ALocFine, aPatch)
+        AElementFine    = fem.assemblePatchMatrix(NCoarseElement, world.ALocFine, aPatch[TFinetIndexMap])
+        basisPatch      = fem.assembleProlongationMatrix(ec.NPatchCoarse, NCoarseElement)
+        correctorsPatch = np.column_stack(ec.fsi.correctorsList)
+
+        localBasis = world.localBasis
+
+        KmsijShouldBe = -basisPatch.T*(APatchFine*(correctorsPatch))
+        KmsijShouldBe[TCoarsepIndexMap,:] += np.dot(localBasis.T, AElementFine*localBasis)
+        
+        self.assertTrue(np.isclose(np.max(np.abs(ec.csi.Kmsij-KmsijShouldBe)), 0))
+        
+        
     def test_computeSingleT(self):
         NWorldCoarse = np.array([4, 5, 6])
         NCoarseElement = np.array([5, 2, 3])
@@ -140,6 +186,8 @@ class corrector_TestCase(unittest.TestCase):
 
         self.assertTrue(np.allclose(np.sum(ec.csi.Kij, axis=0), 0))
         self.assertTrue(np.allclose(np.sum(ec.csi.Kij, axis=1), 0))
+        self.assertTrue(np.allclose(np.sum(ec.csi.Kmsij, axis=0), 0))
+        self.assertTrue(np.allclose(np.sum(ec.csi.Kmsij, axis=1), 0))
 
         # I had difficulties come up with test cases here. This test
         # verifies that most "energy" is in the element T.

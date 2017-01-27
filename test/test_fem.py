@@ -207,7 +207,46 @@ class assemblePatchBoundaryMatrix_TestCase(unittest.TestCase):
                                    [0, 0,   -10,  10,  20, 100]]).T
         self.assertTrue(np.allclose(CComputed.todense(), CCorrect))
 
-        
+    def test_assemblePatchBoundaryMassMatrix2d(self):
+        NPatch = np.array([1, 2])
+        CLocGetter = fem.localBoundaryMassMatrixGetter(NPatch)
+        boundaryMap = np.array([[True, True], [True, True]])
+        CComputed = fem.assemblePatchBoundaryMatrix(NPatch, CLocGetter, boundaryMap=boundaryMap)
+        CCorrect = 1./12*np.array([[6,  2,  1,  0,   0,  0],
+                                   [2,  6,  0,  1,   0,  0],
+                                   [1,  0,  4,  0,   1,  0],
+                                   [0,  1,  0,  4,   0,  1],
+                                   [0,  0,  1,  0,   6,  2],
+                                   [0,  0,  0,  1,   2,  6]]).T
+        self.assertTrue(np.allclose(CComputed.todense(), CCorrect))
+
+        NPatch = np.array([1, 2])
+        CLocGetter = fem.localBoundaryMassMatrixGetter(NPatch)
+        boundaryMap = np.array([[True, True], [False, True]])
+        CComputed = fem.assemblePatchBoundaryMatrix(NPatch, CLocGetter, boundaryMap=boundaryMap)
+        CCorrect = 1./12*np.array([[2,  0,  1,  0,   0,  0],
+                                   [0,  2,  0,  1,   0,  0],
+                                   [1,  0,  4,  0,   1,  0],
+                                   [0,  1,  0,  4,   0,  1],
+                                   [0,  0,  1,  0,   6,  2],
+                                   [0,  0,  0,  1,   2,  6]]).T
+
+        self.assertTrue(np.allclose(CComputed.todense(), CCorrect))
+
+        NPatch = np.array([1, 2])
+        CLocGetter = fem.localBoundaryMassMatrixGetter(NPatch)
+        boundaryMap = np.array([[False, False], [True, True]])
+        CComputed = fem.assemblePatchBoundaryMatrix(NPatch, CLocGetter, boundaryMap=boundaryMap)
+        CCorrect = 1./12*np.array([[4,  2,  0,  0,   0,  0],
+                                   [2,  4,  0,  0,   0,  0],
+                                   [0,  0,  0,  0,   0,  0],
+                                   [0,  0,  0,  0,   0,  0],
+                                   [0,  0,  0,  0,   4,  2],
+                                   [0,  0,  0,  0,   2,  4]]).T
+
+        self.assertTrue(np.allclose(CComputed.todense(), CCorrect))
+
+       
 class stiffnessMatrixProperties_TestCase(unittest.TestCase):
     def test_stiffnessMatrixProperties(self):
         # Stiffness bilinear form should map constants to 0

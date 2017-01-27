@@ -97,7 +97,7 @@ def assemblePatchMatrix(NPatch, ALoc, aPatch=None):
     
     return APatch
 
-def assemblePatchBoundaryMatrix(NPatch, CLocGetter, aPatch=None):
+def assemblePatchBoundaryMatrix(NPatch, CLocGetter, aPatch=None, boundaryMap=None):
     # Integral over part of boundary can be implemented by adding an
     # input "chi" as an indicator function to be callable with edge
     # midpoints as inputs.
@@ -107,6 +107,9 @@ def assemblePatchBoundaryMatrix(NPatch, CLocGetter, aPatch=None):
 
     if aPatch is None:
         aPatch = np.ones(Nt)
+
+    if boundaryMap is None:
+        boundaryMap = np.ones([d,2], dtype='bool')
 
     rows = []
     cols = []
@@ -120,23 +123,24 @@ def assemblePatchBoundaryMatrix(NPatch, CLocGetter, aPatch=None):
         rows0, cols0 = localToPatchSparsityPattern(NPatch, NSubPatch=NEdge)
 
         for neg in [False, True]:
-            CLoc = CLocGetter(k, neg)
-            if not neg:
-                edgeElementIndneg = edgeElementInd0
-                rowsneg = rows0
-                colsneg = cols0
-            else:
-                pointIndexDisplacement = int(np.prod(NPatch[:k]+1)*(NPatch[k]-1))
-                elementIndexDisplacement = int(np.prod(NPatch[:k])*(NPatch[k]-1))
-                edgeElementIndneg = edgeElementInd0 + elementIndexDisplacement
-                rowsneg = rows0 + pointIndexDisplacement
-                colsneg = cols0 + pointIndexDisplacement
+            if boundaryMap[k][int(neg)]:
+                CLoc = CLocGetter(k, neg)
+                if not neg:
+                    edgeElementIndneg = edgeElementInd0
+                    rowsneg = rows0
+                    colsneg = cols0
+                else:
+                    pointIndexDisplacement = int(np.prod(NPatch[:k]+1)*(NPatch[k]-1))
+                    elementIndexDisplacement = int(np.prod(NPatch[:k])*(NPatch[k]-1))
+                    edgeElementIndneg = edgeElementInd0 + elementIndexDisplacement
+                    rowsneg = rows0 + pointIndexDisplacement
+                    colsneg = cols0 + pointIndexDisplacement
 
-            valuesneg = np.kron(aPatch[edgeElementIndneg], CLoc.flatten())
-            
-            rows = np.hstack([rows, rowsneg])
-            cols = np.hstack([cols, colsneg])
-            values = np.hstack([values, valuesneg])
+                valuesneg = np.kron(aPatch[edgeElementIndneg], CLoc.flatten())
+
+                rows = np.hstack([rows, rowsneg])
+                cols = np.hstack([cols, colsneg])
+                values = np.hstack([values, valuesneg])
 
 
     APatch = sparse.csc_matrix((values, (rows, cols)), shape=(Np, Np))
