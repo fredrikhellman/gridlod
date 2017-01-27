@@ -118,7 +118,6 @@ class PetrovGalerkinLOD_TestCase(unittest.TestCase):
     def test_1d(self):
         # Example from Peterseim, Variational Multiscale Stabilization and the Exponential Decay of correctors, p. 2
         # Two modifications: A with minus and u(here) = 1/4*u(paper).
-        return
         NFine = np.array([3200])
         NpFine = np.prod(NFine+1)
         NList = [10, 20, 40, 80, 160]
@@ -146,13 +145,14 @@ class PetrovGalerkinLOD_TestCase(unittest.TestCase):
         for N in NList:
             NWorldCoarse = np.array([N])
             NCoarseElement = NFine/NWorldCoarse
-            world = World(NWorldCoarse, NCoarseElement)
+            boundaryConditions = np.array([[0, 0]])
+            world = World(NWorldCoarse, NCoarseElement, boundaryConditions)
             
             xpCoarse = util.pCoordinates(NWorldCoarse).flatten()
             
             NpCoarse = np.prod(NWorldCoarse+1)
 
-            IPatchGenerator = lambda i, N: interp.L2ProjectionPatchMatrix(i, N, NWorldCoarse, NCoarseElement)
+            IPatchGenerator = lambda i, N: interp.L2ProjectionPatchMatrix(i, N, NWorldCoarse, NCoarseElement, boundaryConditions)
             aCoef = coef.coefficientFine(NWorldCoarse, NCoarseElement, aFine)
 
             pglod = pg.PetrovGalerkinLOD(world, k, IPatchGenerator, 0)
@@ -189,7 +189,6 @@ class PetrovGalerkinLOD_TestCase(unittest.TestCase):
             self.assertTrue(newErrorFine < previousErrorFine)
 
     def test_1d_toReference(self):
-        return
         NWorldFine = np.array([200])
         NWorldCoarse = np.array([10])
         NCoarseElement = NWorldFine/NWorldCoarse
@@ -206,7 +205,7 @@ class PetrovGalerkinLOD_TestCase(unittest.TestCase):
         
         k = 10
             
-        IPatchGenerator = lambda i, N: interp.L2ProjectionPatchMatrix(i, N, NWorldCoarse, NCoarseElement)
+        IPatchGenerator = lambda i, N: interp.L2ProjectionPatchMatrix(i, N, NWorldCoarse, NCoarseElement, boundaryConditions)
         aCoef = coef.coefficientFine(NWorldCoarse, NCoarseElement, aBase)
 
         pglod = pg.PetrovGalerkinLOD(world, k, IPatchGenerator, 0)
@@ -241,7 +240,7 @@ class PetrovGalerkinLOD_TestCase(unittest.TestCase):
         uFineFull += gFine
 
         errorFine = np.sqrt(np.dot(uFineFull - uLodFine, AFine*(uFineFull - uLodFine)))
-        print errorFine
+        self.assertTrue(np.isclose(errorFine, 0))
         
     def test_2d_exactSolution(self):
         NWorldFine = np.array([30, 40])
@@ -265,7 +264,6 @@ class PetrovGalerkinLOD_TestCase(unittest.TestCase):
         aBase = aBaseCube.flatten()
 
         IPatchGenerator = lambda i, N: interp.L2ProjectionPatchMatrix(i, N, NWorldCoarse, NCoarseElement, boundaryConditions)
-        IWorld = IPatchGenerator(0*NWorldCoarse, NWorldCoarse)
         
         aCoef = coef.coefficientFine(NWorldCoarse, NCoarseElement, aBase)
         
@@ -279,7 +277,7 @@ class PetrovGalerkinLOD_TestCase(unittest.TestCase):
         coords = util.pCoordinates(NWorldCoarse)
         xC = coords[:,0]
         yC = coords[:,1]
-        g = xC**2 - (1-yC)**2
+        g = 1-xC
         bFull = -KmsFull*g
 
         boundaryMap = boundaryConditions==0
