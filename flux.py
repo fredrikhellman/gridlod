@@ -6,42 +6,99 @@ import util
 import fem
 import linalg
 
-class ConservativeFluxComputer:
-    def __init__(self, world, R):
-        '''
-        world 
+def computeBoundaryFlux(world, ROmega):
+    NWorldCoarse = world.NWorldCoarse
+    NpCoarse = np.prod(NWorldCoarse+1)
+    
+    boundaryMap = world.boundaryConditions==0
+    dirichletNodes = util.boundarypIndexMap(NWorldCoarse, boundaryMap)
 
-        R      
-               a function that, given a subdomain omega,
-               returns the residual functional:
-                   R(omega)(v) = a(u, v)_omega - (f, v)_omega
-               for v in the full FE space of fineness given 
-               in NCoarseElement.'''
-        self.world = world
-        self.R = R
+    MLocGetter = fem.localBoundaryMassMatrixGetter(NWorldCoarse)
+    MDirichletFull = fem.assemblePatchBoundaryMatrix(NWorldCoarse,
+                                                     MLocGetter,
+                                                     boundaryMap=boundaryMap)
 
-    def computeBoundaryFlux(self):
-        world = self.world
-        R = self.R
+    # Solve MDirichletNodes * sigmaDirichletNodes = RDirichletNodes
+    MDirichletNodes = MDirichletFull[dirichletNodes][:,dirichletNodes]
+    RDiricheletNodes = ROmega[dirichletNodes]
 
-        NWorldFine = world.NWorldCoarse*world.NCoarseElement
-        NWorldCoarse = world.NWorldCoarse
-        NCoarseElement = world.NCoarseElement
+    sigmaDirichletNodes = sparse.linalg.spsolve(MDirichletNodes, RDiricheletNodes)
+    sigmaDirichlet = np.zeros(NpCoarse)
+    sigmaDirichlet[dirichletNodes] = sigmaDirichletNodes
+    
+    return sigmaDirichlet
+
+def computeCoarseElementFlux(world, ROmega, RT, TInds=None):
+    NWorldCoarse = world.NWorldCoarse
+    NtCoarse = np.prod(NWorldCoarse)
+    d = np.size(NWorldCoarse)
+
+    if TInds is None:
+        TInds = np.arange(NtCoarse)
+
+    if RT.ndim == 1:
+        RT = RT[:,np.newaxis]
         
-        boundaryMap = world.boundaryConditions==0
-        dirichletNodes = util.boundarypIndexMap(NWorldCoarse, boundaryMap)
+    assert(RT.shape[1] == np.size(TInds))
+    
+    # Compute boundary flux
+    sigmaDirichlet = computeBoundaryFlux(world, ROmega)
+    
+    worldDirichletBoundaryMap = world.boundaryConditions==0
+    MLocGetter = fem.localBoundaryMassMatrixGetter(NWorldCoarse)
 
-        MLocGetter = fem.localBoundaryMassMatrixGetter(NWorldCoarse)
-        MDirichletFull = fem.assemblePatchBoundaryMatrix(NWorldCoarse,
+    NTInds = np.size(TInds)
+    sigmaFluxT = np.zeros([2**d, NTInds])
+
+    for TInd in TInds:
+        print ',',
+        iWorldCoarse = util.convertpIndexToCoordinate(NWorldCoarse-1, TInd)
+        boundary0 = iWorldCoarse==0
+        boundary1 = (iWorldCoarse + 1) == NWorldCoarse
+
+        # Much of this is equal from iteration to iteration, can be sped up if needed
+        localBoundaryMap = np.column_stack([boundary0, boundary1])
+        localBoundaryNodes = util.boundarypIndexMap(np.ones_like(NWorldCoarse),
+                                                    localBoundaryMap)
+
+        localDirichletBoundaryMap = np.logical_and(localBoundaryMap, worldDirichletBoundaryMap)
+        localDirichletBoundaryNodes = util.boundarypIndexMap(np.ones_like(NWorldCoarse),
+                                                             localDirichletBoundaryMap)
+        ###
+        # Why not do like this? Just don't use boundary flux. Only compute element flux
+        localDirichletBoundaryNodes = np.array([], dtype='int64')
+        ###
+        
+        MDirichletFull = fem.assemblePatchBoundaryMatrix(np.ones_like(NWorldCoarse),
                                                          MLocGetter,
-                                                         boundaryMap=boundaryMap)
+                                                         boundaryMap=localDirichletBoundaryMap)
 
-        ROmega = R(np.zeros_like(NWorldCoarse), NWorldCoarse)
+        localFluxBoundaryMap = np.logical_not(localBoundaryMap)
+        ###
+        localFluxBoundaryMap = np.logical_not(np.logical_and(localBoundaryMap, world.boundaryConditions==1))
+        ###
+        localFluxBoundaryNodes = util.boundarypIndexMap(np.ones_like(NWorldCoarse),
+                                                        localFluxBoundaryMap)
 
-        # Solve MDirichletNodes * sigmaDirichletNodes = RDirichletNodes
-        MDirichletNodes = MDirichletFull[dirichletNodes][:,dirichletNodes]
-        RDiricheletNodes = ROmega[dirichletNodes]
+        MFluxFull = fem.assemblePatchBoundaryMatrix(np.ones_like(NWorldCoarse),
+                                                    MLocGetter,
+                                                    boundaryMap=localFluxBoundaryMap)
+        MFluxNodes = MFluxFull[localFluxBoundaryNodes][:,localFluxBoundaryNodes]
+        MDirichletNodes = MDirichletFull[localFluxBoundaryNodes][:,localDirichletBoundaryNodes]
 
-        omegaDirichletNodes = sparse.linalg.spsolve(MDirichletNodes, RDiricheletNodes)
+        RFull = RT[:,TInd]
+        RFluxNodes = RFull[localFluxBoundaryNodes]
 
-        return omegaDirichletNodes, dirichletNodes
+        # Find which world Dirichlet nodes corresponds to the local Dirichlet nodes
+        elementNodes = util.convertpCoordinateToIndex(NWorldCoarse, iWorldCoarse) + \
+                       util.lowerLeftpIndexMap(np.ones_like(NWorldCoarse), NWorldCoarse)
+        elementDirichletBoundaryNodes = elementNodes[localDirichletBoundaryNodes]
+        sigmaDirichletLocalized = sigmaDirichlet[elementDirichletBoundaryNodes]
+
+        # Solve MFluxNodes*sigma = RFluxNodes - MDirichletNodes*sigmaDirichletLocalized
+        bFluxNodes = RFluxNodes - MDirichletNodes*sigmaDirichletLocalized
+        sigmaFlux = sparse.linalg.spsolve(MFluxNodes, bFluxNodes)
+
+        sigmaFluxT[localFluxBoundaryNodes, TInd] = sigmaFlux
+        
+    return sigmaFluxT, sigmaDirichlet
