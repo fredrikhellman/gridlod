@@ -87,6 +87,9 @@ def pIndexMap(NFrom, NTo, NStep):
     indexMap = np.fromfunction(uLinearIndex, shape=NFrom[::-1]+1, dtype='int64').flatten()
     return indexMap
 
+def elementpIndexMap(NTo):
+    return lowerLeftpIndexMap(np.ones_like(NTo), NTo)
+
 def lowerLeftpIndexMap(NFrom, NTo):
     return pIndexMap(NFrom, NTo, np.ones(np.size(NFrom), dtype='int64'))
 
