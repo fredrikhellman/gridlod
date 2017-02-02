@@ -16,15 +16,20 @@ def linearpIndexBasis(N):
     return b
 
 def convertpIndexToCoordinate(N, ind):
+    ind = np.array(ind)
     d = np.size(N)
+    if ind.ndim > 0:
+        m = np.size(ind)
+        coord = np.zeros([d, m], dtype='int64')
+    else:
+        coord = np.zeros([d], dtype='int64')
     basis = linearpIndexBasis(N)
-    coord = np.zeros_like(N)
     for i in range(d-1,-1,-1):
-        coord[i] = ind//basis[i]
-        ind -= coord[i]*basis[i]
-    assert(ind == 0)
+        coord[i,...] = ind//basis[i]
+        ind -= coord[i,...]*basis[i]
+    assert(np.all(ind == 0))
     return coord
-    
+
 def convertpCoordinateToIndex(N, coord):
     basis = linearpIndexBasis(N)
     return np.dot(basis, coord)

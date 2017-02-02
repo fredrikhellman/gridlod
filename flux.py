@@ -1,5 +1,6 @@
 import numpy as np
 import scipy.sparse as sparse
+import itertools as it
 
 from world import World
 import util
@@ -48,42 +49,41 @@ def computeCoarseElementFlux(world, RT, TInds=None):
     sigmaFluxT = np.zeros([2**d, NTInds])
     nodeFluxT = np.zeros([2**d, NTInds])
 
-    class Cache:
-        MFluxNodes = None
-        localFluxBoundaryNodes = None
-        boundary0 = None
-        boundary1 = None
+    def boundaryHash(boundary01):
+        n = np.size(boundary01)
+        val = np.dot(boundary01, 2**np.arange(0,n))
+        return val
+
+    def computeStuff(boundary01):
+        localBoundaryMap = np.reshape(boundary01, [d, 2])
+        localBoundaryNodes = util.boundarypIndexMap(np.ones_like(NWorldCoarse),
+                                                    localBoundaryMap)
+        localFluxBoundaryMap = np.logical_not(np.logical_and(localBoundaryMap, world.boundaryConditions==1))
         
-    def computeStuff(boundary0, boundary1):
-        if Cache.MFluxNodes is not None and np.all(Cache.boundary0 == boundary0) and np.all(Cache.boundary1 == boundary1):
-            pass
-        else:
-            localBoundaryMap = np.column_stack([boundary0, boundary1])
-            localBoundaryNodes = util.boundarypIndexMap(np.ones_like(NWorldCoarse),
-                                                        localBoundaryMap)
-            localFluxBoundaryMap = np.logical_not(np.logical_and(localBoundaryMap, world.boundaryConditions==1))
-
-            localFluxBoundaryNodes = util.boundarypIndexMap(np.ones_like(NWorldCoarse),
-                                                            localFluxBoundaryMap)
-
-            MFluxFull = fem.assemblePatchBoundaryMatrix(np.ones_like(NWorldCoarse),
-                                                        MLocGetter,
-                                                        boundaryMap=localFluxBoundaryMap).todense()
-            MFluxNodes = MFluxFull[localFluxBoundaryNodes][:,localFluxBoundaryNodes]
-            Cache.MFluxNodes = MFluxNodes
-            Cache.localFluxBoundaryNodes = localFluxBoundaryNodes
-            Cache.boundary0 = np.array(boundary0)
-            Cache.boundary1 = np.array(boundary1)
+        localFluxBoundaryNodes = util.boundarypIndexMap(np.ones_like(NWorldCoarse),
+                                                        localFluxBoundaryMap)
+        
+        MFluxFull = fem.assemblePatchBoundaryMatrix(np.ones_like(NWorldCoarse),
+                                                    MLocGetter,
+                                                    boundaryMap=localFluxBoundaryMap).todense()
+        MFluxNodes = MFluxFull[localFluxBoundaryNodes][:,localFluxBoundaryNodes]
+        MFluxNodesInv = np.linalg.inv(MFluxNodes)
             
-        return Cache.MFluxNodes, Cache.localFluxBoundaryNodes
+        return MFluxNodes, MFluxNodesInv, localFluxBoundaryNodes
 
+    precomputed = {}
+    for boundary01 in it.product(*([[0,1]]*(2*d))):
+        boundary01 = np.array(boundary01)
+        precomputed[boundaryHash(boundary01)] = computeStuff(boundary01)
+        
+    iWorldCoarses = util.convertpIndexToCoordinate(NWorldCoarse-1, TInds)
     for TInd in TInds:
-        print ',',
-        iWorldCoarse = util.convertpIndexToCoordinate(NWorldCoarse-1, TInd)
-        boundary0 = iWorldCoarse==0
-        boundary1 = (iWorldCoarse + 1) == NWorldCoarse
+        iWorldCoarse = iWorldCoarses[:,TInd]
+        boundary01 = np.zeros(2*d)
+        boundary01[:d] = iWorldCoarse==0
+        boundary01[d:] = (iWorldCoarse + 1)==NWorldCoarse
 
-        MFluxNodes, localFluxBoundaryNodes = computeStuff(boundary0, boundary1)
+        MFluxNodes, MFluxNodesInv, localFluxBoundaryNodes = precomputed[boundaryHash(boundary01)]
         
         RFull = RT[:,TInd]
         RFluxNodes = RFull[localFluxBoundaryNodes]
@@ -91,7 +91,8 @@ def computeCoarseElementFlux(world, RT, TInds=None):
         # Solve MFluxNodes*sigma = RFluxNodes - MDirichletNodes*sigmaDirichletLocalized
         bFluxNodes = RFluxNodes
         
-        sigmaFlux = np.linalg.solve(MFluxNodes, bFluxNodes)
+        #sigmaFlux = np.linalg.solve(MFluxNodes, bFluxNodes)
+        sigmaFlux = np.array(np.dot(MFluxNodesInv, bFluxNodes)).T.squeeze()
         sigmaFluxT[localFluxBoundaryNodes, TInd] = sigmaFlux
         nodeFlux = np.dot(MFluxNodes, sigmaFlux)
         nodeFluxT[localFluxBoundaryNodes, TInd] = nodeFlux

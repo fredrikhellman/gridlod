@@ -102,7 +102,7 @@ class computeBoundaryFlux_TestCase(unittest.TestCase):
         self.assertTrue(np.allclose(sigmaFluxT[0,:]+sigmaFluxT[1,:], -0.5*(fFull[:-1]+fFull[1:])/Nt))
         
     def test_computeCoarseElementFlux_2d(self):
-        NWorldCoarse = np.array([4*80, 4*80])
+        NWorldCoarse = np.array([80, 80])
         NCoarseElement = np.array([1, 1])
         boundaryConditions = np.array([[0, 0],
                                        [0, 0]])
@@ -135,8 +135,6 @@ class computeBoundaryFlux_TestCase(unittest.TestCase):
         uFree = sparse.linalg.spsolve(A, b)
         uFull = np.zeros(Np)
         uFull[free] = uFree
-
-        print np.sqrt(np.dot(uFull-uRefFull, AFull*(uFull-uRefFull)))
     
         RT = np.zeros([2**d, Nt])
         TpIndex = util.elementpIndexMap(NWorldCoarse)
@@ -170,7 +168,7 @@ class computeBoundaryFlux_TestCase(unittest.TestCase):
         self.assertTrue(np.isclose(np.max(np.abs(MBoundaryFull*boundaryFluxRef-nodeFluxes)), 0, atol=1e-2))
 
 if __name__ == '__main__':
-    import cProfile
-    command = """unittest.main()"""
-    cProfile.runctx( command, globals(), locals(), filename="test_pg.profile" )
-    #unittest.main()
+    #import cProfile
+    #command = """unittest.main()"""
+    #cProfile.runctx( command, globals(), locals(), filename="test_pg.profile" )
+    unittest.main()
