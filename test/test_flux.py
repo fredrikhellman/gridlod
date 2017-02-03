@@ -167,7 +167,7 @@ class computeBoundaryFlux_TestCase(unittest.TestCase):
                                                         MLocGetter)
         self.assertTrue(np.isclose(np.max(np.abs(MBoundaryFull*boundaryFluxRef-nodeFluxes)), 0, atol=1e-2))
 
-    def test_computeCoarseElementFlux_2d(self):
+    def test_computeCoarseElementFlux_2d_twoScales(self):
         NWorldCoarse = np.array([20, 20])
         NCoarseElement = np.array([5, 5])
         NWorldFine = NWorldCoarse*NCoarseElement
