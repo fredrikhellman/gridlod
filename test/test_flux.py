@@ -167,6 +167,93 @@ class computeBoundaryFlux_TestCase(unittest.TestCase):
                                                         MLocGetter)
         self.assertTrue(np.isclose(np.max(np.abs(MBoundaryFull*boundaryFluxRef-nodeFluxes)), 0, atol=1e-2))
 
+    def test_computeCoarseElementFlux_2d(self):
+        NWorldCoarse = np.array([20, 20])
+        NCoarseElement = np.array([5, 5])
+        NWorldFine = NWorldCoarse*NCoarseElement
+        boundaryConditions = np.array([[0, 0],
+                                       [0, 0]])
+        d = 2
+        
+        world = World(NWorldCoarse, NCoarseElement, boundaryConditions)
+
+        coordsFine = util.pCoordinates(NWorldFine)
+        xFine = coordsFine[:,0]
+        yFine = coordsFine[:,1]
+
+        coordsCoarse = util.pCoordinates(NWorldCoarse)
+        xCoarse = coordsCoarse[:,0]
+        yCoarse = coordsCoarse[:,1]
+
+        aCoef = 1
+        bCoef = 1
+        
+        uRefFull = np.sin(2*np.pi*aCoef*xFine)*np.sin(2*np.pi*bCoef*yFine)
+        fFull = ((2*np.pi*aCoef)**2 + (2*np.pi*bCoef)**2)*uRefFull
+
+        NpFine = np.prod(NWorldFine+1)
+        NpCoarse = np.prod(NWorldCoarse+1)
+        NtCoarse = np.prod(NWorldCoarse)
+
+        free = util.interiorpIndexMap(NWorldFine)
+        
+        AFull = fem.assemblePatchMatrix(NWorldFine, world.ALocFine)
+        A = AFull[free][:,free]
+        MFull = fem.assemblePatchMatrix(NWorldFine, world.MLocFine)
+        bFull = MFull*fFull
+        b = bFull[free]
+        
+        uFree = sparse.linalg.spsolve(A, b)
+        uFull = np.zeros(NpFine)
+        uFull[free] = uFree
+    
+        ATFull = fem.assemblePatchMatrix(NCoarseElement, world.ALocFine)
+        MTFull = fem.assemblePatchMatrix(NCoarseElement, world.MLocFine)
+        localBasis = world.localBasis
+
+        ###
+        RT = np.zeros([2**d, NtCoarse])
+        TpIndex = util.lowerLeftpIndexMap(NCoarseElement, NWorldFine)
+        TpStart = util.pIndexMap(NWorldCoarse-1, NWorldFine, NCoarseElement)
+        for T in np.arange(NtCoarse):
+            RT[:,T] = np.dot(localBasis.T,
+                             ATFull*(uFull[TpStart[T] + TpIndex]) -
+                             MTFull*(fFull[TpStart[T] + TpIndex]))
+        ###
+        
+        sigmaFluxT, nodeFluxT = flux.computeCoarseElementFlux(world, RT)
+
+        ###
+        nodeFluxes = np.zeros(NpCoarse)
+        TpIndex = util.elementpIndexMap(NWorldCoarse)
+        TpStart = util.lowerLeftpIndexMap(NWorldCoarse-1, NWorldCoarse)
+        for T in np.arange(NtCoarse):
+            nodeFluxes[TpStart[T] + TpIndex] += nodeFluxT[:,T]
+        ###
+            
+        freeCoarse = util.interiorpIndexMap(NWorldCoarse)
+        fixedCoarse = util.boundarypIndexMap(NWorldCoarse)
+        
+        self.assertTrue(np.allclose(nodeFluxes[freeCoarse], 0))
+            
+        PCoarse = fem.assembleProlongationMatrix(NWorldCoarse, NCoarseElement)
+        ROmega = PCoarse.T*(AFull*uFull - bFull)
+        boundaryFlux = flux.computeBoundaryFlux(world, ROmega)
+        
+        boundaryFluxRefx0 = -(1.*(xCoarse < 0+1e-7))*(2*np.pi*aCoef*np.cos(2*np.pi*aCoef*xCoarse)*np.sin(2*np.pi*bCoef*yCoarse))
+        boundaryFluxRefx1 =  (1.*(xCoarse > 1-1e-7))*(2*np.pi*aCoef*np.cos(2*np.pi*aCoef*xCoarse)*np.sin(2*np.pi*bCoef*yCoarse))
+        boundaryFluxRefy0 = -(1.*(yCoarse < 0+1e-7))*(2*np.pi*bCoef*np.sin(2*np.pi*aCoef*xCoarse)*np.cos(2*np.pi*bCoef*yCoarse))
+        boundaryFluxRefy1 =  (1.*(yCoarse > 1-1e-7))*(2*np.pi*bCoef*np.sin(2*np.pi*aCoef*xCoarse)*np.cos(2*np.pi*bCoef*yCoarse))
+        boundaryFluxRef = boundaryFluxRefx0 + boundaryFluxRefx1 + boundaryFluxRefy0 + boundaryFluxRefy1
+        boundaryFluxRef[freeCoarse] = 0
+        relativeDiscreteErrorNorm = np.linalg.norm((boundaryFlux - boundaryFluxRef)[fixedCoarse])/np.linalg.norm(boundaryFlux[fixedCoarse])
+        self.assertTrue(np.isclose(relativeDiscreteErrorNorm, 0, atol=1e-2))
+
+        MLocGetter = fem.localBoundaryMassMatrixGetter(NWorldCoarse)
+        MBoundaryFull = fem.assemblePatchBoundaryMatrix(NWorldCoarse,
+                                                        MLocGetter)
+        self.assertTrue(np.isclose(np.max(np.abs(MBoundaryFull*boundaryFluxRef-nodeFluxes)), 0, atol=1e-2))
+        
 if __name__ == '__main__':
     #import cProfile
     #command = """unittest.main()"""

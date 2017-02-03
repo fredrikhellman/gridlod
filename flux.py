@@ -7,9 +7,13 @@ import util
 import fem
 import linalg
 
+
 def computeBoundaryFlux(world, ROmega):
     NWorldCoarse = world.NWorldCoarse
     NpCoarse = np.prod(NWorldCoarse+1)
+
+    # Only the dirichlet nodes of ROmega are used....
+    assert(np.size(ROmega) == NpCoarse)
     
     boundaryMap = world.boundaryConditions==0
     dirichletNodes = util.boundarypIndexMap(NWorldCoarse, boundaryMap)
