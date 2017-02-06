@@ -512,7 +512,7 @@ def imposeBoundaryConditionsStronglyOnInterpolation(B, fixed):
     BStrong = B.copy()
     nzFixedCols = BStrong[:,fixed].nonzero()
     BStrong[nzFixedCols[0],fixed[nzFixedCols[1]]] = 0
-    BStrong.eliminate_zeros()
-    BStrong = BStrong[BStrong.getnnz(1)>0]
+    keepRows = np.where(np.abs(BStrong).sum(1) >= 1e-12)[0]
+    BStrong = BStrong[keepRows]
     return BStrong
 
