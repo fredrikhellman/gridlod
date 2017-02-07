@@ -119,7 +119,7 @@ class PetrovGalerkinLOD:
         NtCoarse = np.prod(world.NWorldCoarse)
         for TInd in range(NtCoarse):
             if self.printLevel > 0:
-                print str(TInd) + ' / ' + str(NtCoarse),
+                print str(TInd) + ' / ' + str(NtCoarse)
                 
             ecT = self.ecList[TInd]
             
