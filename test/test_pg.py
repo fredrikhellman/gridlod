@@ -218,6 +218,10 @@ class PetrovGalerkinLOD_TestCase(unittest.TestCase):
 
         errorFine = np.sqrt(np.dot(uFineFull - uLodFine, AFine*(uFineFull - uLodFine)))
         self.assertTrue(np.isclose(errorFine, 0))
+
+        # Also compute upscaled solution and compare with uFineFull
+        uLodFineUpscaled = basis*(xFull + g) - pglod.computeCorrection(ARhsFull=basis*(xFull + g))
+        self.assertTrue(np.allclose(uLodFineUpscaled, uLodFine))
         
     def test_2d_exactSolution(self):
         NWorldFine = np.array([30, 40])
@@ -302,12 +306,19 @@ class PetrovGalerkinLOD_TestCase(unittest.TestCase):
             if firstIteration:
                 self.assertTrue(np.isclose(errorFineA, 0))
                 self.assertTrue(np.isclose(errorFineM, 0))
+
+                # Also compute upscaled solution and compare with uFineFull
+                uLodFineUpscaled = basis*(xFull + g) - pglod.computeCorrection(ARhsFull=basis*(xFull + g))
+                self.assertTrue(np.allclose(uLodFineUpscaled, uLodFine))
+                
                 firstIteration = False
             else:
                 # For this problem, it seems that
                 # error < 1.1*errorTol
                 self.assertTrue(errorFineA <= 1.1*epsilonTol)
-        
+
+
+                
     def test_2d_flux(self):
         # Stripes perpendicular to flow direction gives effective
         # permeability as the harmonic mean of the permeabilities of

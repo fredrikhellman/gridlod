@@ -113,25 +113,6 @@ def ritzProjectionToFinePatchWithGivenSaddleSolver(world,
     
     fixed = util.boundarypIndexMap(NPatchFine, boundaryMap)
     
-    '''
-    def imposeBoundaryConditionsStronglyOnMatrix(A, fixed):
-        AStrong = A.copy()
-        nzFixedCols = AStrong[:,fixed].nonzero()
-        AStrong[nzFixedCols[0],fixed[nzFixedCols[1]]] = 0
-        nzFixedRows = AStrong[fixed,:].nonzero()
-        AStrong[fixed[nzFixedRows[0]],nzFixedRows[1]] = 0
-        AStrong[fixed,fixed] = 1
-        return AStrong
-
-    def imposeBoundaryConditionsStronglyOnVector(b, fixed):
-        bStrong = b.copy()
-        bStrong[fixed] = 0
-        return bStrong
-
-    APatch = imposeBoundaryConditionsStronglyOnMatrix(APatchFull, fixed)
-    bPatchList = [imposeBoundaryConditionsStronglyOnVector(bPatchFull, fixed) for bPatchFull in bPatchFullList]
-    '''
-
     #projectionsList = saddleSolver.solve(APatch, IPatch, bPatchList)
 
     projectionsList = saddleSolver.solve(APatchFull, IPatch, bPatchFullList, fixed, NPatchCoarse, world.NCoarseElement)
@@ -154,10 +135,7 @@ class elementCorrector:
         self.iPatchWorldCoarse = iPatchWorldCoarse
 
         if saddleSolver == None:
-#            self._saddleSolver = nullspaceOneLevelHierarchySolver(self.NPatchCoarse,
-#                                                                  world.NCoarseElement)
             self._saddleSolver = schurComplementSolver()
-#            self._saddleSolver = directSolver()
         else:
             self._saddleSolver = saddleSolver
             
@@ -182,20 +160,30 @@ class elementCorrector:
     def saddleSolver(self, value):
         self._saddleSolver = value
             
-    def computeCorrectors(self, coefficientPatch, IPatch):
+    def computeElementCorrector(self, coefficientPatch, IPatch, ARhsList=None, MRhsList=None):
         '''Compute the fine correctors over the patch.
 
-        Compute the correctors Q_T\lambda_i (T is given by the class instance):
+        Compute the correctors
 
-        (A \nabla Q_T lambda_j, \nabla lambda_i)_{U_K(T)} = (A \nabla lambda_j, \nabla lambda_i)_{T}
-
-        and store them in the self.fsi object, together with the extracted A|_{U_k(T)}
+        (A \nabla Q_T_j, \nabla vf)_{U_K(T)} = (A \nabla ARhs_j, \nabla vf)_{T} + (MRhs_j, vf)_{T}
         '''
+
+        assert(ARhsList is not None or MRhsList is not None)
+        numRhs = None
+
+        if ARhsList is not None:
+            assert(numRhs is None or numRhs == len(ARhsList))
+            numRhs = len(ARhsList)
+
+        if MRhsList is not None:
+            assert(numRhs is None or numRhs == len(MRhsList))
+            numRhs = len(MRhsList)
+
         world = self.world
         NCoarseElement = world.NCoarseElement
         NPatchCoarse = self.NPatchCoarse
         d = np.size(NCoarseElement)
-        
+
         NPatchFine = NPatchCoarse*NCoarseElement
         NtFine = np.prod(NPatchFine)
         NpFineCoarseElement = np.prod(NCoarseElement+1)
@@ -203,13 +191,13 @@ class elementCorrector:
         NpFine = np.prod(NPatchFine+1)
 
         aPatch = coefficientPatch.aFine
-        
+
         assert(np.size(aPatch) == NtFine)
 
         ALocFine = world.ALocFine
+        MLocFine = world.MLocFine
 
         iElementPatchCoarse = self.iElementPatchCoarse
-        
         elementFinetIndexMap = util.extractElementFine(NPatchCoarse,
                                                        NCoarseElement,
                                                        iElementPatchCoarse,
@@ -219,14 +207,19 @@ class elementCorrector:
                                                        iElementPatchCoarse,
                                                        extractElements=False)
 
-        AElementFull = fem.assemblePatchMatrix(NCoarseElement, ALocFine, aPatch[elementFinetIndexMap])
+        if ARhsList is not None:
+            AElementFull = fem.assemblePatchMatrix(NCoarseElement, ALocFine, aPatch[elementFinetIndexMap])
+        if MRhsList is not None:
+            MElementFull = fem.assemblePatchMatrix(NCoarseElement, MLocFine)
         APatchFull = fem.assemblePatchMatrix(NPatchFine, ALocFine, aPatch)
-        
+
         bPatchFullList = []
-        localBasis = world.localBasis
-        for phi in localBasis.T:
+        for rhsIndex in range(numRhs):
             bPatchFull = np.zeros(NpFine)
-            bPatchFull[elementFinepIndexMap] = AElementFull*phi
+            if ARhsList is not None:
+                bPatchFull[elementFinepIndexMap] += AElementFull*ARhsList[rhsIndex]
+            if MRhsList is not None:
+                bPatchFull[elementFinepIndexMap] += MElementFull*MRhsList[rhsIndex]
             bPatchFullList.append(bPatchFull)
 
         correctorsList = ritzProjectionToFinePatchWithGivenSaddleSolver(world,
@@ -236,6 +229,21 @@ class elementCorrector:
                                                                         bPatchFullList,
                                                                         IPatch,
                                                                         self.saddleSolver)
+        return correctorsList
+
+    def computeCorrectors(self, coefficientPatch, IPatch):
+        '''Compute the fine correctors over the patch.
+
+        Compute the correctors Q_T\lambda_i (T is given by the class instance):
+
+        (A \nabla Q_T lambda_j, \nabla vf)_{U_K(T)} = (A \nabla lambda_j, \nabla vf)_{T}
+
+        and store them in the self.fsi object, together with the extracted A|_{U_k(T)}
+        '''
+        d = np.size(self.NPatchCoarse)
+        ARhsList = map(np.squeeze, np.hsplit(self.world.localBasis, 2**d))
+
+        correctorsList = self.computeElementCorrector(coefficientPatch, IPatch, ARhsList)
         
         self.fsi = self.FineScaleInformation(coefficientPatch, correctorsList)
         

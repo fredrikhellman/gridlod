@@ -1,5 +1,6 @@
 import numpy as np
 import scipy.sparse as sparse
+from copy import deepcopy
 
 import lod
 import util
@@ -20,6 +21,7 @@ class PetrovGalerkinLOD:
         self.Kms = None
         self.K = None
         self.basisCorrectors = None
+        self.coefficient = None
         
     def updateCorrectors(self, coefficient, clearFineQuantities=True):
         world = self.world
@@ -31,11 +33,13 @@ class PetrovGalerkinLOD:
 
         saddleSolver = lod.schurComplementSolver(world.NWorldCoarse*world.NCoarseElement)
 
+        self.coefficient = deepcopy(coefficient)
+        
         # Reset all caches
         self.Kms = None
         self.K = None
         self.basisCorrectors = None
-
+        
         if self.ecList is None:
             self.ecList = [None]*NtCoarse
 
@@ -89,7 +93,60 @@ class PetrovGalerkinLOD:
     def clearCorrectors(self):
         NtCoarse = np.prod(self.world.NWorldCoarse)
         self.ecList = None
+        self.coefficient = None
 
+    def computeCorrection(self, ARhsFull=None, MRhsFull=None):
+        assert(self.ecList is not None)
+        assert(self.coefficient is not None)
+
+        world = self.world
+        NCoarseElement = world.NCoarseElement
+        NWorldCoarse = world.NWorldCoarse
+        NWorldFine = NWorldCoarse*NCoarseElement
+
+        NpFine = np.prod(NWorldFine+1)
+        
+        coefficient = self.coefficient
+        IPatchGenerator = self.IPatchGenerator
+
+        localBasis = world.localBasis
+        
+        TpIndexMap = util.lowerLeftpIndexMap(NCoarseElement, NWorldFine)
+        TpStartIndices = util.pIndexMap(NWorldCoarse-1, NWorldFine, NCoarseElement)
+        
+        uFine = np.zeros(NpFine)
+        
+        NtCoarse = np.prod(world.NWorldCoarse)
+        for TInd in range(NtCoarse):
+            if self.printLevel > 0:
+                print str(TInd) + ' / ' + str(NtCoarse),
+                
+            ecT = self.ecList[TInd]
+            
+            coefficientPatch = coefficient.localize(ecT.iPatchWorldCoarse, ecT.NPatchCoarse)
+            IPatch = IPatchGenerator(ecT.iPatchWorldCoarse, ecT.NPatchCoarse)
+
+            if ARhsFull is not None:
+                ARhsList = [ARhsFull[TpStartIndices[TInd] + TpIndexMap]]
+            else:
+                ARhsList = None
+                
+            if MRhsFull is not None:
+                MRhsList = [MRhsFull[TpStartIndices[TInd] + TpIndexMap]]
+            else:
+                MRhsList = None
+                
+            correctorT = ecT.computeElementCorrector(coefficientPatch, IPatch, ARhsList, MRhsList)[0]
+            
+            NPatchFine = ecT.NPatchCoarse*NCoarseElement
+            iPatchWorldFine = ecT.iPatchWorldCoarse*NCoarseElement
+            patchpIndexMap = util.lowerLeftpIndexMap(NPatchFine, NWorldFine)
+            patchpStartIndex = util.convertpCoordinateToIndex(NWorldFine, iPatchWorldFine)
+
+            uFine[patchpStartIndex + patchpIndexMap] += correctorT
+
+        return uFine
+    
     def assembleBasisCorrectors(self):
         if self.basisCorrectors is not None:
             return self.basisCorrectors
