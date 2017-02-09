@@ -2,12 +2,8 @@ import unittest
 import numpy as np
 import itertools as it
 
-from world import World
-import lod
-import fem
-import interp
-import util
-import coef
+from gridlod import lod, fem, interp, util, coef, world
+from gridlod.world import World
 
 class ritzProjectionToFinePatch_TestCase(unittest.TestCase):
     def test_trivial(self):

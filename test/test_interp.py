@@ -3,7 +3,7 @@ import numpy as np
 import scipy.sparse as sparse
 import scipy.sparse.linalg
 
-import interp
+from gridlod import interp
 
 class nodalPatchMatrix_TestCase(unittest.TestCase):
     def test_nodalPatchMatrix(self):

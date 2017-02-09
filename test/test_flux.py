@@ -3,10 +3,8 @@ import numpy as np
 import scipy.sparse as sparse
 import scipy.sparse.linalg
 
-from world import World
-import flux
-import fem
-import util
+from gridlod import flux, fem, util, world
+from gridlod.world import World
 
 class computeBoundaryFlux_TestCase(unittest.TestCase):
 

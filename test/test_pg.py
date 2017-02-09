@@ -7,14 +7,8 @@ import os
 
 from pyevtk.hl import imageToVTK 
 
-import pg
-from world import World
-import interp
-import coef
-import util
-import fem
-import linalg
-import femsolver
+from gridlod import pg, interp, coef, util, fem, world, linalg, femsolver
+from gridlod.world import World
 
 def saveCube(name, data, shape):
     uCube = np.reshape(data, shape[::-1])

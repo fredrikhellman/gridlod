@@ -1,7 +1,7 @@
 import unittest
 import numpy as np
 
-import util
+from gridlod import util
 
 class convert_TestCase(unittest.TestCase):
     def test_convertpCoordinateToIndex(self):

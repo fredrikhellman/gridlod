@@ -1,7 +1,7 @@
 import unittest
 import numpy as np
 
-import coef
+from gridlod import coef
 
 class coefficientCoarseFactor_TestCase(unittest.TestCase):
     def test_coefficientCoarseFactor(self):

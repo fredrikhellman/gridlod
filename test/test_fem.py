@@ -3,8 +3,7 @@ import numpy as np
 import scipy.sparse as sparse
 import scipy.sparse.linalg
 
-import fem
-import util
+from gridlod import fem, util
 
 class localMatrix_TestCase(unittest.TestCase):
     def test_massMatrix1d(self):
