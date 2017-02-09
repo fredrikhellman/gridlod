@@ -1,6 +1,7 @@
 import numpy as np
 import scipy.sparse as sparse
 import itertools as it
+import scipy.signal as signal
 
 from world import World
 import util
@@ -50,8 +51,8 @@ def computeCoarseElementFlux(world, RT, TInds=None):
     MLocGetter = fem.localBoundaryMassMatrixGetter(NWorldCoarse)
 
     NTInds = np.size(TInds)
-    sigmaFluxT = np.zeros([2**d, NTInds])
-    nodeFluxT = np.zeros([2**d, NTInds])
+    sigmaFluxT = np.zeros([NTInds, 2**d])
+    nodeFluxT = np.zeros([NTInds, 2**d])
 
     def boundaryHash(boundary01):
         n = np.size(boundary01)
@@ -97,8 +98,63 @@ def computeCoarseElementFlux(world, RT, TInds=None):
         
         #sigmaFlux = np.linalg.solve(MFluxNodes, bFluxNodes)
         sigmaFlux = np.array(np.dot(MFluxNodesInv, bFluxNodes)).T.squeeze()
-        sigmaFluxT[localFluxBoundaryNodes, TInd] = sigmaFlux
+        sigmaFluxT[TInd, localFluxBoundaryNodes] = sigmaFlux
         nodeFlux = np.dot(MFluxNodes, sigmaFlux)
-        nodeFluxT[localFluxBoundaryNodes, TInd] = nodeFlux
+        nodeFluxT[TInd, localFluxBoundaryNodes] = nodeFlux
         
     return sigmaFluxT, nodeFluxT
+
+def computeMeanElementwiseQuantity(world, boundaryFsValues, fsT):
+    NWorldCoarse = world.NWorldCoarse
+    d = np.size(NWorldCoarse)
+    
+    boundaryConditions = world.boundaryConditions
+    
+    fsCube = fsT.reshape(NWorldCoarse, order='F')
+    fsBorderCube = np.zeros(NWorldCoarse+2)
+    fsBorderCube[[slice(1,-1)]*d] = fsCube
+
+    # Set Dirichlet boundary conditions
+    for k in range(d):
+        index = [slice(None)]*d
+        if boundaryConditions[k,0]==0:
+            index[k] = 0
+            fsBorderCube[index] = boundaryFsValues[k,0]
+        if boundaryConditions[k,1]==0:
+            index[k] = -1
+            fsBorderCube[index] = boundaryFsValues[k,1]
+
+    # For other boundary segments, copy
+    for k in range(d):
+        index = [slice(None)]*d
+        indexInner = [slice(None)]*d
+        if boundaryConditions[k,0] != 0:
+            index[k] = 0
+            indexInner[k] = 1
+            fsBorderCube[index] = fsBorderCube[indexInner]
+        if boundaryConditions[k,1] != 0:
+            index[k] = -1
+            indexInner[k] = -2
+            fsBorderCube[index] = fsBorderCube[indexInner]
+            
+    # Apply convolution
+    avgFilter = np.ones([2]*d)/(2**d)
+    nodeFsCube = signal.convolve(fsBorderCube, avgFilter, mode='valid')
+    nodeFs = nodeFsCube.flatten(order='F')
+    return nodeFs
+
+def computeElementNetFlux(world, boundaryFsValues, fsT, nodeFluxT):
+    NWorldCoarse = world.NWorldCoarse
+    NtCoarse = np.prod(NWorldCoarse)
+
+    nodeFs = computeMeanElementwiseQuantity(world, boundaryFsValues, fsT)
+
+    TpIndexMap = util.elementpIndexMap(NWorldCoarse)
+    TpStartIndices = util.lowerLeftpIndexMap(NWorldCoarse-1, NWorldCoarse)
+    TpIndices = np.add.outer(TpStartIndices, TpIndexMap)
+
+    nodeFsT = nodeFs[TpIndices]
+
+    netFluxT = np.einsum('ij, ij -> i', nodeFsT, nodeFluxT)
+
+    return netFluxT

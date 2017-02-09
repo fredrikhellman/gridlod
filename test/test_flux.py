@@ -96,8 +96,8 @@ class computeBoundaryFlux_TestCase(unittest.TestCase):
     
         sigmaFluxT, _ = flux.computeCoarseElementFlux(world, RT)
 
-        self.assertTrue(np.allclose(sigmaFluxT[0,1:], -sigmaFluxT[1,0:-1]))
-        self.assertTrue(np.allclose(sigmaFluxT[0,:]+sigmaFluxT[1,:], -0.5*(fFull[:-1]+fFull[1:])/Nt))
+        self.assertTrue(np.allclose(sigmaFluxT[1:,0], -sigmaFluxT[0:-1, 1]))
+        self.assertTrue(np.allclose(sigmaFluxT[:,0]+sigmaFluxT[:,1], -0.5*(fFull[:-1]+fFull[1:])/Nt))
         
     def test_computeCoarseElementFlux_2d(self):
         NWorldCoarse = np.array([80, 80])
@@ -144,7 +144,7 @@ class computeBoundaryFlux_TestCase(unittest.TestCase):
         sigmaFluxT, nodeFluxT = flux.computeCoarseElementFlux(world, RT)
         nodeFluxes = np.zeros(Np)
         for T in np.arange(Nt):
-            nodeFluxes[TpStart[T] + TpIndex] += nodeFluxT[:,T]
+            nodeFluxes[TpStart[T] + TpIndex] += nodeFluxT[T,:]
 
         self.assertTrue(np.allclose(nodeFluxes[free], 0))
             
@@ -226,7 +226,7 @@ class computeBoundaryFlux_TestCase(unittest.TestCase):
         TpIndex = util.elementpIndexMap(NWorldCoarse)
         TpStart = util.lowerLeftpIndexMap(NWorldCoarse-1, NWorldCoarse)
         for T in np.arange(NtCoarse):
-            nodeFluxes[TpStart[T] + TpIndex] += nodeFluxT[:,T]
+            nodeFluxes[TpStart[T] + TpIndex] += nodeFluxT[T,:]
         ###
             
         freeCoarse = util.interiorpIndexMap(NWorldCoarse)
@@ -252,6 +252,112 @@ class computeBoundaryFlux_TestCase(unittest.TestCase):
                                                         MLocGetter)
         self.assertTrue(np.isclose(np.max(np.abs(MBoundaryFull*boundaryFluxRef-nodeFluxes)), 0, atol=1e-2))
         
+class computeMeanElementwiseQuantity_TestCase(unittest.TestCase):
+    def test_computeMeanElementwiseQuantity_1d(self):
+        NWorldCoarse = np.array([10])
+        NCoarseElement = np.array([5])
+        boundaryConditions = np.array([[0, 0]])
+        world = World(NWorldCoarse, NCoarseElement, boundaryConditions)
+
+        boundaryFsValues = np.array([[-11, 101]])
+        fsT = np.array([1, 3, 5, 7, 9, 11, 13, 15, 17, 19])
+
+        nodeFs = flux.computeMeanElementwiseQuantity(world, boundaryFsValues, fsT)
+
+        self.assertTrue(np.allclose(nodeFs, [-5, 2, 4, 6, 8, 10, 12, 14, 16, 18, 60]))
+
+        boundaryConditions = np.array([[1, 0]])
+        world = World(NWorldCoarse, NCoarseElement, boundaryConditions)
+        boundaryFsValues = np.array([[np.nan, 101]])
+        nodeFs = flux.computeMeanElementwiseQuantity(world, boundaryFsValues, fsT)
+        self.assertTrue(np.allclose(nodeFs, [1, 2, 4, 6, 8, 10, 12, 14, 16, 18, 60]))
+
+        boundaryConditions = np.array([[0, 1]])
+        world = World(NWorldCoarse, NCoarseElement, boundaryConditions)
+        boundaryFsValues = np.array([[0, 101]])
+        nodeFs = flux.computeMeanElementwiseQuantity(world, boundaryFsValues, fsT)
+        self.assertTrue(np.allclose(nodeFs, [0.5, 2, 4, 6, 8, 10, 12, 14, 16, 18, 19]))
+
+        boundaryConditions = np.array([[1, 1]])
+        world = World(NWorldCoarse, NCoarseElement, boundaryConditions)
+        boundaryFsValues = np.array([[222, 111]])
+        nodeFs = flux.computeMeanElementwiseQuantity(world, boundaryFsValues, fsT)
+        self.assertTrue(np.allclose(nodeFs, [1, 2, 4, 6, 8, 10, 12, 14, 16, 18, 19]))
+
+    def test_computeMeanElementwiseQuantity_2d(self):
+        NWorldCoarse = np.array([3, 3])
+        NCoarseElement = np.array([5, 5])
+        boundaryConditions = np.array([[0, 0],
+                                       [0, 0]])
+        world = World(NWorldCoarse, NCoarseElement, boundaryConditions)
+
+        boundaryFsValues = np.array([[0, 10],
+                                     [20, 30]])
+        fsT = np.array([10, 20, 30, 40, 50, 60, 70, 80, 90])
+
+        nodeFs = flux.computeMeanElementwiseQuantity(world, boundaryFsValues, fsT)
+        self.assertTrue(np.allclose(nodeFs, [12.5, 17.5, 22.5, 20,
+                                             12.5, 30, 40, 27.5,
+                                             27.5, 60, 70, 42.5,
+                                             32.5, 52.5, 57.5, 40]))
+
+        boundaryConditions = np.array([[0, 1],
+                                       [1, 1]])
+        world = World(NWorldCoarse, NCoarseElement, boundaryConditions)
+
+        boundaryFsValues = np.array([[0, np.nan],
+                                     [np.nan, np.nan]])
+        fsT = np.array([10, 20, 30, 40, 50, 60, 70, 80, 90])
+
+        nodeFs = flux.computeMeanElementwiseQuantity(world, boundaryFsValues, fsT)
+        self.assertTrue(np.allclose(nodeFs, [5, 15, 25, 30,
+                                             12.5, 30, 40, 45,
+                                             27.5, 60, 70, 75,
+                                             35, 75, 85, 90]))
+class computeElementNetFlux_TestCase(unittest.TestCase):
+    def test_computeElementNetFlux_1d(self):
+        NWorldCoarse = np.array([4])
+        NCoarseElement = np.array([5])
+        boundaryConditions = np.array([[0, 0]])
+        
+        world = World(NWorldCoarse, NCoarseElement, boundaryConditions)
+
+        boundaryFsValues = np.array([[0, 0]])
+        nodeFluxT = np.array([[1, -2],
+                              [2, -4],
+                              [4,  1],
+                              [-1, 0]])
+        fsT = np.array([2, 2, 3, 1])
+
+        # avg fs       = 1  2  2.5   2  0.5      net
+        # avg fs*flux  = 1 -4                    -3
+        #                   4  -10               -6
+        #                       10   2           12 
+        #                           -2    0      -2
+        
+        netFluxT = flux.computeElementNetFlux(world, boundaryFsValues, fsT, nodeFluxT)
+        self.assertTrue(np.allclose(netFluxT, [-3, -6, 12, -2]))
+
+    def test_computeElementNetFlux_2d(self):
+        NWorldCoarse = np.array([1, 1])
+        NCoarseElement = np.array([5, 5])
+        boundaryConditions = np.array([[0, 0],
+                                       [1, 1]])
+        
+        world = World(NWorldCoarse, NCoarseElement, boundaryConditions)
+
+        boundaryFsValues = np.array([[0, 20],
+                                     [np.nan, np.nan]])
+        nodeFluxT = np.array([[1, 2, 3, 4]])
+        fsT = np.array([10])
+
+        # (0+10)/2 = 5
+        # (20+10)/2 = 15
+        # 1*5 + 30 + 15 + 60 = 110
+        
+        netFluxT = flux.computeElementNetFlux(world, boundaryFsValues, fsT, nodeFluxT)
+        self.assertTrue(np.allclose(netFluxT, [110]))
+
 if __name__ == '__main__':
     #import cProfile
     #command = """unittest.main()"""
