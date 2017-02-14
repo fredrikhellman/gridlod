@@ -26,18 +26,24 @@ def computeElementFaceVelocity(NWorldCoarse, NCoarseElement, aWorld, uWorld):
     CLocGetter = fem.localBoundaryNormalDerivativeMatrixGetter(NWorldFine)
     boundaryMap = np.zeros([d, 2], dtype='bool')
     for TInd in np.arange(NtCoarse):
+        print TInd, NtCoarse
         aElement = aWorld[TFinetStartIndices[TInd] + TFinetIndexMap]
         uElement = uWorld[TFinepStartIndices[TInd] + TFinepIndexMap]
         for F in faces:
             boundaryMap[:] = False
             boundaryMap.flat[F] = True
             AFace = fem.assemblePatchBoundaryMatrix(NCoarseElement, CLocGetter, aElement, boundaryMap)
-            velocityFace = np.sum(AFace*uElement)
+            velocityFace = -np.sum(AFace*uElement) ### Too big probably.....
             velocityTF[TInd,F] = velocityFace
 
     return velocityTF
 
 def computeAverageFaceVelocity(NWorldCoarse, velocityTF):
+    # Note  I: these velocities are not conservative and do not fulfill
+    #          strongly with Neumann boundary conditions
+    #
+    # Note II: the velocities are integrated and hence already scaled with face
+    #          area
     d = np.size(NWorldCoarse)
     b = util.linearpIndexBasis(NWorldCoarse-1)
 
@@ -83,3 +89,17 @@ def computeUpwindSaturation(NWorldCoarse, boundarys, sT, velocityTF):
             sTF[TIndDst, faceInd] = boundarys[k, face]
             
     return sTF
+
+def computeElementNetFlux(world, avgVelocityTF, sT, boundarys, fractionalFlow, fCoarse=None, sWellCoarse=None):
+    NWorldCoarse = world.NWorldCoarse
+    
+    fsT = fractionalFlow(sT)
+    boundaryfs = fractionalFlow(boundarys)
+    fsTF = computeUpwindSaturation(NWorldCoarse, boundaryfs, fsT, avgVelocityTF)
+
+    # Ignore fCoarse, sWellCoarse for now
+    assert(fCoarse is None and sWellCoarse is None)
+
+    netFluxT = -np.einsum('tf, tf -> t', fsTF, avgVelocityTF)
+
+    return netFluxT
