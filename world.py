@@ -10,9 +10,17 @@ class World:
             boundaryConditions = np.zeros([d,2], dtype='int64')
         assert(boundaryConditions.shape == (d,2))
 
+        NWorldFine = NWorldCoarse*NCoarseElement
+
         self.NWorldCoarse = NWorldCoarse
         self.NCoarseElement = NCoarseElement
         self.boundaryConditions = np.array(boundaryConditions)
+        self.NWorldFine = NWorldFine
+        
+        self.NpFine = np.prod(NWorldFine+1)
+        self.NtFine = np.prod(NWorldFine)
+        self.NpCoarse = np.prod(NWorldCoarse+1)
+        self.NtCoarse = np.prod(NWorldCoarse)
 
     @property
     def localBasis(self):
@@ -43,5 +51,3 @@ class World:
         if not hasattr(self, '_ALocFine'):
             self._ALocFine = fem.localStiffnessMatrix(self.NWorldCoarse*self.NCoarseElement)
         return self._ALocFine
-    
-

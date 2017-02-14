@@ -3,7 +3,7 @@ import numpy as np
 import scipy.sparse as sparse
 import scipy.sparse.linalg
 
-from gridlod import flux, fem, util, world
+from gridlod import nodeflux, fem, util, world
 from gridlod.world import World
 
 class computeBoundaryFlux_TestCase(unittest.TestCase):
@@ -33,7 +33,7 @@ class computeBoundaryFlux_TestCase(unittest.TestCase):
 
         ROmega = AFull*uFull - bFull
     
-        sigma = flux.computeBoundaryFlux(world, ROmega)
+        sigma = nodeflux.computeBoundaryFlux(world, ROmega)
         self.assertTrue(np.size(sigma) == Np)
         self.assertTrue(np.isclose(sigma[-1], 0.5))
         self.assertTrue(np.isclose(sigma[-1], NWorldCoarse[0]*(uFull[-1]-uFull[-2]), atol=1./NWorldCoarse[0]))
@@ -55,7 +55,7 @@ class computeBoundaryFlux_TestCase(unittest.TestCase):
 
         ROmega = ACoarseFull*uCoarse
     
-        sigma = flux.computeBoundaryFlux(world, ROmega)
+        sigma = nodeflux.computeBoundaryFlux(world, ROmega)
 
         boundaryMap = boundaryConditions==0
         dirichletNodes = util.boundarypIndexMap(NWorldCoarse, boundaryMap)
@@ -94,7 +94,7 @@ class computeBoundaryFlux_TestCase(unittest.TestCase):
             RT[:,T] = np.dot(world.ALocCoarse, np.array([uFull[T], uFull[T+1]])) - \
                       np.dot(world.MLocCoarse, np.array([fFull[T], fFull[T+1]]))
     
-        sigmaFluxT, _ = flux.computeCoarseElementFlux(world, RT)
+        sigmaFluxT, _ = nodeflux.computeCoarseElementFlux(world, RT)
 
         self.assertTrue(np.allclose(sigmaFluxT[1:,0], -sigmaFluxT[0:-1, 1]))
         self.assertTrue(np.allclose(sigmaFluxT[:,0]+sigmaFluxT[:,1], -0.5*(fFull[:-1]+fFull[1:])/Nt))
@@ -141,7 +141,7 @@ class computeBoundaryFlux_TestCase(unittest.TestCase):
             RT[:,T] = np.dot(world.ALocCoarse, uFull[TpStart[T] + TpIndex]) - \
                       np.dot(world.MLocCoarse, fFull[TpStart[T] + TpIndex])
     
-        sigmaFluxT, nodeFluxT = flux.computeCoarseElementFlux(world, RT)
+        sigmaFluxT, nodeFluxT = nodeflux.computeCoarseElementFlux(world, RT)
         nodeFluxes = np.zeros(Np)
         for T in np.arange(Nt):
             nodeFluxes[TpStart[T] + TpIndex] += nodeFluxT[T,:]
@@ -149,7 +149,7 @@ class computeBoundaryFlux_TestCase(unittest.TestCase):
         self.assertTrue(np.allclose(nodeFluxes[free], 0))
             
         ROmega = AFull*uFull - bFull
-        boundaryFlux = flux.computeBoundaryFlux(world, ROmega)
+        boundaryFlux = nodeflux.computeBoundaryFlux(world, ROmega)
 
         boundaryFluxRefx0 = -(1.*(x < 0+1e-7))*(2*np.pi*aCoef*np.cos(2*np.pi*aCoef*x)*np.sin(2*np.pi*bCoef*y))
         boundaryFluxRefx1 =  (1.*(x > 1-1e-7))*(2*np.pi*aCoef*np.cos(2*np.pi*aCoef*x)*np.sin(2*np.pi*bCoef*y))
@@ -219,7 +219,7 @@ class computeBoundaryFlux_TestCase(unittest.TestCase):
                              MTFull*(fFull[TpStart[T] + TpIndex]))
         ###
         
-        sigmaFluxT, nodeFluxT = flux.computeCoarseElementFlux(world, RT)
+        sigmaFluxT, nodeFluxT = nodeflux.computeCoarseElementFlux(world, RT)
 
         ###
         nodeFluxes = np.zeros(NpCoarse)
@@ -236,7 +236,7 @@ class computeBoundaryFlux_TestCase(unittest.TestCase):
             
         PCoarse = fem.assembleProlongationMatrix(NWorldCoarse, NCoarseElement)
         ROmega = PCoarse.T*(AFull*uFull - bFull)
-        boundaryFlux = flux.computeBoundaryFlux(world, ROmega)
+        boundaryFlux = nodeflux.computeBoundaryFlux(world, ROmega)
         
         boundaryFluxRefx0 = -(1.*(xCoarse < 0+1e-7))*(2*np.pi*aCoef*np.cos(2*np.pi*aCoef*xCoarse)*np.sin(2*np.pi*bCoef*yCoarse))
         boundaryFluxRefx1 =  (1.*(xCoarse > 1-1e-7))*(2*np.pi*aCoef*np.cos(2*np.pi*aCoef*xCoarse)*np.sin(2*np.pi*bCoef*yCoarse))
@@ -262,26 +262,26 @@ class computeMeanElementwiseQuantity_TestCase(unittest.TestCase):
         boundaryFsValues = np.array([[-11, 101]])
         fsT = np.array([1, 3, 5, 7, 9, 11, 13, 15, 17, 19])
 
-        nodeFs = flux.computeMeanElementwiseQuantity(world, boundaryFsValues, fsT)
+        nodeFs = nodeflux.computeMeanElementwiseQuantity(world, boundaryFsValues, fsT)
 
         self.assertTrue(np.allclose(nodeFs, [-5, 2, 4, 6, 8, 10, 12, 14, 16, 18, 60]))
 
         boundaryConditions = np.array([[1, 0]])
         world = World(NWorldCoarse, NCoarseElement, boundaryConditions)
         boundaryFsValues = np.array([[np.nan, 101]])
-        nodeFs = flux.computeMeanElementwiseQuantity(world, boundaryFsValues, fsT)
+        nodeFs = nodeflux.computeMeanElementwiseQuantity(world, boundaryFsValues, fsT)
         self.assertTrue(np.allclose(nodeFs, [1, 2, 4, 6, 8, 10, 12, 14, 16, 18, 60]))
 
         boundaryConditions = np.array([[0, 1]])
         world = World(NWorldCoarse, NCoarseElement, boundaryConditions)
         boundaryFsValues = np.array([[0, 101]])
-        nodeFs = flux.computeMeanElementwiseQuantity(world, boundaryFsValues, fsT)
+        nodeFs = nodeflux.computeMeanElementwiseQuantity(world, boundaryFsValues, fsT)
         self.assertTrue(np.allclose(nodeFs, [0.5, 2, 4, 6, 8, 10, 12, 14, 16, 18, 19]))
 
         boundaryConditions = np.array([[1, 1]])
         world = World(NWorldCoarse, NCoarseElement, boundaryConditions)
         boundaryFsValues = np.array([[222, 111]])
-        nodeFs = flux.computeMeanElementwiseQuantity(world, boundaryFsValues, fsT)
+        nodeFs = nodeflux.computeMeanElementwiseQuantity(world, boundaryFsValues, fsT)
         self.assertTrue(np.allclose(nodeFs, [1, 2, 4, 6, 8, 10, 12, 14, 16, 18, 19]))
 
     def test_computeMeanElementwiseQuantity_2d(self):
@@ -295,7 +295,7 @@ class computeMeanElementwiseQuantity_TestCase(unittest.TestCase):
                                      [20, 30]])
         fsT = np.array([10, 20, 30, 40, 50, 60, 70, 80, 90])
 
-        nodeFs = flux.computeMeanElementwiseQuantity(world, boundaryFsValues, fsT)
+        nodeFs = nodeflux.computeMeanElementwiseQuantity(world, boundaryFsValues, fsT)
         self.assertTrue(np.allclose(nodeFs, [12.5, 17.5, 22.5, 20,
                                              12.5, 30, 40, 27.5,
                                              27.5, 60, 70, 42.5,
@@ -309,11 +309,12 @@ class computeMeanElementwiseQuantity_TestCase(unittest.TestCase):
                                      [np.nan, np.nan]])
         fsT = np.array([10, 20, 30, 40, 50, 60, 70, 80, 90])
 
-        nodeFs = flux.computeMeanElementwiseQuantity(world, boundaryFsValues, fsT)
+        nodeFs = nodeflux.computeMeanElementwiseQuantity(world, boundaryFsValues, fsT)
         self.assertTrue(np.allclose(nodeFs, [5, 15, 25, 30,
                                              12.5, 30, 40, 45,
                                              27.5, 60, 70, 75,
                                              35, 75, 85, 90]))
+
 class computeElementNetFlux_TestCase(unittest.TestCase):
     def test_computeElementNetFlux_1d(self):
         NWorldCoarse = np.array([4])
@@ -335,7 +336,7 @@ class computeElementNetFlux_TestCase(unittest.TestCase):
         #                       10   2           12 
         #                           -2    0      -2
         
-        netFluxT = flux.computeElementNetFlux(world, boundaryFsValues, fsT, nodeFluxT)
+        netFluxT = nodeflux.computeElementNetFlux(world, boundaryFsValues, fsT, nodeFluxT)
         self.assertTrue(np.allclose(netFluxT, [-3, -6, 12, -2]))
 
     def test_computeElementNetFlux_2d(self):
@@ -355,7 +356,7 @@ class computeElementNetFlux_TestCase(unittest.TestCase):
         # (20+10)/2 = 15
         # 1*5 + 30 + 15 + 60 = 110
         
-        netFluxT = flux.computeElementNetFlux(world, boundaryFsValues, fsT, nodeFluxT)
+        netFluxT = nodeflux.computeElementNetFlux(world, boundaryFsValues, fsT, nodeFluxT)
         self.assertTrue(np.allclose(netFluxT, [110]))
 
 if __name__ == '__main__':
