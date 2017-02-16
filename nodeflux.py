@@ -84,9 +84,10 @@ def computeCoarseElementFlux(world, RT, TInds=None):
     iWorldCoarses = util.convertpIndexToCoordinate(NWorldCoarse-1, TInds)
     for TInd in TInds:
         iWorldCoarse = iWorldCoarses[:,TInd]
-        boundary01 = np.zeros(2*d)
-        boundary01[:d] = iWorldCoarse==0
-        boundary01[d:] = (iWorldCoarse + 1)==NWorldCoarse
+
+        boundary01 = np.zeros(2*d, dtype='int64')
+        boundary01[::2] = iWorldCoarse==0
+        boundary01[1::2] = (iWorldCoarse + 1)==NWorldCoarse
 
         MFluxNodes, MFluxNodesInv, localFluxBoundaryNodes = precomputed[boundaryHash(boundary01)]
         
