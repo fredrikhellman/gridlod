@@ -28,67 +28,93 @@ def computeElementFaceVelocityFromSigma(NWorldCoarse, sigmaFluxT):
 
     return velocityTF
 
-def computeHarmonicMeanAverageFaceVelocity(NWorldCoarse, NCoarseElement, aWorld, uWorld):
+def faceElementIndices(NPatchCoarse, NCoarseElement, k, boundary):
+    '''Return indices of fine elements adjacent to face (k, boundary) for all coarse triangles
 
+    Return type shape: (NtCoarse, Number of elements of face)
+    '''
+    NPatchFine = NPatchCoarse*NCoarseElement
+
+    NFace = np.array(NCoarseElement)
+    NFace[k] = 1
+    
+    tPatchBasis = util.linearpIndexBasis(NPatchFine-1)
+    tStepToFace = boundary*tPatchBasis[k]*(NCoarseElement[k]-1)
+
+    tIndexMap = tStepToFace + util.lowerLeftpIndexMap(NFace-1, NPatchFine-1)
+    tStartIndices = util.pIndexMap(NPatchCoarse-1, NPatchFine-1, NCoarseElement)
+    tIndices = np.add.outer(tStartIndices, tIndexMap)
+    
+    return tIndices
+
+def faceElementPointIndices(NPatchCoarse, NCoarseElement, k, boundary):
+    '''Return indices of points in fine elements adjacent to face (k, boundary) for all coarse triangles
+
+    Return type shape: (NtCoarse, Number of elements of face, 2**d)
+    '''
+    NPatchFine = NPatchCoarse*NCoarseElement
+    
+    tIndices = faceElementIndices(NPatchCoarse, NCoarseElement, k, boundary)
+    tpIndexMap = util.lowerLeftpIndexMap(NPatchFine-1, NPatchFine)
+    elementpIndices = util.elementpIndexMap(NPatchFine)
+
+    pIndices = np.add.outer(tpIndexMap[tIndices], elementpIndices)
+    
+    return pIndices
+
+def harmonicMeanOverFaces(NPatchCoarse, NCoarseElement, k, boundary, aPatch):
+    NPatchFine = NPatchCoarse*NCoarseElement
+    
+    TPatchBasis = util.linearpIndexBasis(NPatchCoarse-1)
+
+    NPatchBottom = np.array(NPatchCoarse)
+    NPatchBottom[k] = 1
+    NtBottom = np.prod(NPatchBottom)
+
+    NPatchBase = np.array(NPatchCoarse)
+    NPatchBase[k] -= 1
+        
+    TIndBase = util.lowerLeftpIndexMap(NPatchBase-1, NPatchCoarse-1)
+    TIndBottom = util.lowerLeftpIndexMap(NPatchBottom-1, NPatchCoarse-1)
+
+    t0Faces = faceElementIndices(NPatchCoarse, NCoarseElement, k, 0)
+    t1Faces = faceElementIndices(NPatchCoarse, NCoarseElement, k, 1)
+
+    aH0Faces = aPatch[t0Faces[TPatchBasis[k] + TIndBase]]
+    aH1Faces = aPatch[t1Faces[TIndBase]]
+
+    if boundary==0:
+        abFaces = aPatch[t0Faces]
+        abFaces[TPatchBasis[k] + TIndBase] = 2*aH0Faces*aH1Faces/(aH0Faces + aH1Faces)
+    elif boundary==1:
+        abFaces = aPatch[t1Faces]
+        abFaces[TIndBase] = 2*aH0Faces*aH1Faces/(aH0Faces + aH1Faces)
+
+    return abFaces
+
+def computeHarmonicMeanFaceVelocity(NWorldCoarse, NPatchCoarse, NCoarseElement, aPatch, uPatch):
     NWorldFine = NWorldCoarse*NCoarseElement
-
-    d = np.size(NWorldFine)
     
-    pWorldBasis = util.linearpIndexBasis(NWorldFine)
-    tWorldBasis = util.linearpIndexBasis(NWorldFine-1)
-
+    NtCoarse = np.prod(NPatchCoarse)
+    d = np.size(NWorldCoarse)
+    
+    velocityTF = np.zeros([NtCoarse, 2*d])
+    
     CLocGetter = fem.localBoundaryNormalDerivativeMatrixGetter(NWorldFine)
-    
     for k in range(d):
-        # Interior
-        NFace = np.array(NCoarseElement)
-        NFace[k] = 1
-
-        tStepToFacei = tWorldBasis[k]*(NCoarseElement[k]-1)
-        tStepToFacej = 0
-
-        pStepToFacei = pWorldBasis[k]*(NCoarseElement[k]-1)
-        pStepToFacej = 0
+        for boundary in [0, 1]:
+            boundaryMap = np.zeros([d, 2], dtype='bool')
+            boundaryMap[k] = [boundary==0, boundary==1]
+            B = fem.assemblePatchBoundaryMatrix(np.ones_like(NPatchCoarse), CLocGetter, None, boundaryMap).todense()
         
-        boundaryMap = np.zeros([d, 2], dtype='bool')
+            aFaces = harmonicMeanOverFaces(NPatchCoarse, NCoarseElement, k, boundary, aPatch)
 
-        boundaryMap[k] = [False, True]
-        Bi = fem.assemblePatchBoundaryMatrix(np.ones_like(NWorldCoarse), CLocGetter, None, boundaryMap).todense()
-        tiIndexMap = tStepToFacei + util.lowerLeftpIndexMap(NFace-1, NWorldFine-1)
-        piIndexMap = pStepToFacei + util.lowerLeftpIndexMap(NFace, NCoarseElement)
-        
-        boundaryMap[k] = [True, False]
-        Bj = fem.assemblePatchBoundaryMatrix(np.ones_like(NWorldCoarse), CLocGetter, None, boundaryMap).todense()
-        tjIndexMap = tWorldBasis[k] + tiIndexMap
-        pjIndexMap = pWorldBasis[k] + piIndexMap
+            pIndices = faceElementPointIndices(NPatchCoarse, NCoarseElement, k, boundary)
+            uFaces = uPatch[pIndices]
 
-        tStartIndices = util.pIndexMap(NWorldCoarse-2, NWorldFine-1, NCoarseElement)
-        pStartIndices = util.pIndexMap(NWorldCoarse-2, NWorldFine, NCoarseElement)
+            velocityTF[:,2*k+boundary] = -np.einsum('Tfp, kp, Tf -> T', uFaces, B, aFaces)
 
-        tiIndices = np.add.outer(tStartIndices, tiIndexMap)
-        tjIndices = np.add.outer(tStartIndices, tjIndexMap)
-        
-        aHarmonic = 2*(aWorld[tiIndices]*aWorld[tjIndices])/(aWorld[tiIndices] + aWorld[tjIndices])
-
-        faceElementpIndexMap = util.lowerLeftpIndexMap(np.ones_like(NFace), NFace)
-        faceElementpStartIndices = util.lowerLeftpIndexMap(NFace-1, NFace)
-        faceElementpIndices = np.add.outer(faceElementpStartIndices, faceElementpIndexMap)
-
-
-        # pi/jfIndices are 3d-tensors: triangle, face, point dof
-        def oneSide(pIndexMap, B):
-            pIndices = np.add.outer(pStartIndices, pIndexMap)
-            pfIndices = pIndices[:,faceElementpIndices]
-            upf = uWorld[pfIndices]
-            return np.einsum('Tfp, kp, Tf -> T', upf, B, aHarmonic)
-
-        
-        velocityFi = oneSide(piIndexMap, Bi)
-        velocityFj = oneSide(pjIndexMap, Bj)
-
-        avgVelocityF = velocityFi-velocityFj
-        
-        ## HOW TO COMPUTE B*u, for each fine face?
+    return velocityTF
     
 def computeElementFaceVelocity(NWorldCoarse, NCoarseElement, aWorld, uWorld):
     '''Per element, compute face normal velocity integrals.'''
