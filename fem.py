@@ -235,3 +235,75 @@ def assembleHierarchicalBasisMatrix(NPatchCoarse, NCoarseElement):
     PHier.eliminate_zeros()
 
     return PHier
+
+def localFaceMassMatrix(N):
+    d = np.size(N)
+    FLoc = np.zeros(2*d)
+    for k in range(d):
+        NFace = np.array(N)
+        NFace[k] = 1
+        faceArea = np.prod(1./NFace)
+        FLoc[2*k:2*k+2] = faceArea
+    return FLoc
+
+def assembleFaceConnectivityMatrix(NPatch, FLoc, boundaryMap=None):
+    Nt = np.prod(NPatch)
+
+    d = np.size(NPatch)
+
+    if boundaryMap is None:
+        boundaryMap = np.zeros([d, 2], dtype='bool')
+    
+    rowsList = []
+    colsList = []
+    valuesList = []
+
+    tBasis = util.linearpIndexBasis(NPatch-1)
+    for k in range(d):
+        for boundary in [0, 1]:
+            NPatchBase = np.array(NPatch)
+            NPatchBase[k] -= 1
+            
+            TIndInterior = (1-boundary)*tBasis[k] + util.lowerLeftpIndexMap(NPatchBase-1, NPatch-1)
+            nT = np.size(TIndInterior)
+
+            FLocRepeated = np.repeat(FLoc[2*k + boundary], nT)
+            
+            # Add diagonal elements
+            rowsList.append(TIndInterior)
+            colsList.append(TIndInterior)
+            valuesList.append(FLocRepeated)
+
+            # Add off-diagonal elements
+            rowsList.append(TIndInterior + (2*boundary - 1)*tBasis[k])
+            colsList.append(TIndInterior)
+            valuesList.append(-FLocRepeated/2.)
+            
+            rowsList.append(TIndInterior)
+            colsList.append(TIndInterior + (2*boundary - 1)*tBasis[k])
+            valuesList.append(-FLocRepeated/2.)
+
+            # Add boundary diagonal elements, if applies
+            if boundaryMap[k, boundary]:
+                NPatchBottom = np.array(NPatch)
+                NPatchBottom[k] = 1
+
+                TIndBoundary = (boundary)*tBasis[k]*(NPatch[k]-1) + \
+                               util.lowerLeftpIndexMap(NPatchBottom-1, NPatch-1)
+                nT = np.size(TIndBoundary)
+                
+                FLocRepeatedBoundary = np.repeat(FLoc[2*k + boundary], nT)
+
+                rowsList.append(TIndBoundary)
+                colsList.append(TIndBoundary)
+                valuesList.append(FLocRepeatedBoundary)
+                
+    # Concatenate lists
+    rows = np.hstack(rowsList)
+    cols = np.hstack(colsList)
+    values = np.hstack(valuesList)
+
+    # Create sparse matrix
+    FC = sparse.csc_matrix((values, (rows, cols)), shape=(Nt, Nt))
+
+    return FC

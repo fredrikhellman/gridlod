@@ -51,3 +51,15 @@ class World:
         if not hasattr(self, '_ALocFine'):
             self._ALocFine = fem.localStiffnessMatrix(self.NWorldCoarse*self.NCoarseElement)
         return self._ALocFine
+
+    @property
+    def FLocCoarse(self):
+        if not hasattr(self, '_FLocCoarse'):
+            self._FLocCoarse = fem.localFaceMassMatrix(self.NWorldCoarse)
+        return self._FLocCoarse
+
+    @property
+    def FLocFine(self):
+        if not hasattr(self, '_FLocFine'):
+            self._FLocFine = fem.localFaceMassMatrix(self.NWorldCoarse*self.NCoarseElement)
+        return self._FLocFine

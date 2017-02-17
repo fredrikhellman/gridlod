@@ -339,5 +339,64 @@ class assembleHierarchicalBasisMatrix_TestCase(unittest.TestCase):
         PHier = fem.assembleHierarchicalBasisMatrix(NPatchCoarse, NCoarseElement)
         self.assertTrue(np.allclose(PHier.diagonal(), 0*PHier.diagonal()+1))
         
+class assembleFaceConnectivityMatrix_TestCase(unittest.TestCase):
+    def test_assembleFaceConnectivityMatrix_1d(self):
+        NPatch = np.array([4])
+
+        FLoc = fem.localFaceMassMatrix(NPatch)
+        
+        FC = fem.assembleFaceConnectivityMatrix(NPatch, FLoc)
+        self.assertTrue(np.allclose(FC.A, np.array([[ 1, -1,  0,  0],
+                                                    [-1,  2, -1,  0],
+                                                    [ 0, -1,  2, -1],
+                                                    [ 0,  0, -1,  1]])))
+
+        boundaryMap = np.array([[True, True]])
+        FC = fem.assembleFaceConnectivityMatrix(NPatch, FLoc, boundaryMap)
+        self.assertTrue(np.allclose(FC.A, np.array([[ 2, -1,  0,  0],
+                                                    [-1,  2, -1,  0],
+                                                    [ 0, -1,  2, -1],
+                                                    [ 0,  0, -1,  2]])))
+
+        boundaryMap = np.array([[False, True]])
+        FC = fem.assembleFaceConnectivityMatrix(NPatch, FLoc, boundaryMap)
+        self.assertTrue(np.allclose(FC.A, np.array([[ 1, -1,  0,  0],
+                                                    [-1,  2, -1,  0],
+                                                    [ 0, -1,  2, -1],
+                                                    [ 0,  0, -1,  2]])))
+
+    def test_assembleFaceConnectivityMatrix_2d(self):
+        NPatch = np.array([2, 3])
+
+        FLoc = fem.localFaceMassMatrix(NPatch)
+        
+        FC = fem.assembleFaceConnectivityMatrix(NPatch, FLoc)
+        self.assertTrue(np.allclose(FC.A, np.array([[ 1./2+1./3,      -1./3,      -1./2,         0,         0,         0],
+                                                    [     -1./3,  1./2+1./3,          0,     -1./2,         0,         0],
+                                                    [     -1./2,          0,  2./2+1./3,     -1./3,     -1./2,         0],
+                                                    [         0,      -1./2,      -1./3, 2./2+1./3,         0,     -1./2],
+                                                    [         0,          0,      -1./2,         0, 1./2+1./3,     -1./3],
+                                                    [         0,          0,          0,     -1./2,     -1./3, 1./2+1./3]])))
+        
+        boundaryMap = np.array([[True, True],
+                                [True, True]])
+        FC = fem.assembleFaceConnectivityMatrix(NPatch, FLoc, boundaryMap)
+        self.assertTrue(np.allclose(FC.A, np.array([[ 2./2+2./3,      -1./3,      -1./2,         0,         0,         0],
+                                                    [     -1./3,  2./2+2./3,          0,     -1./2,         0,         0],
+                                                    [     -1./2,          0,  2./2+2./3,     -1./3,     -1./2,         0],
+                                                    [         0,      -1./2,      -1./3, 2./2+2./3,         0,     -1./2],
+                                                    [         0,          0,      -1./2,         0, 2./2+2./3,     -1./3],
+                                                    [         0,          0,          0,     -1./2,     -1./3, 2./2+2./3]])))
+
+        boundaryMap = np.array([[True, True],
+                                [False, True]])
+        FC = fem.assembleFaceConnectivityMatrix(NPatch, FLoc, boundaryMap)
+        self.assertTrue(np.allclose(FC.A, np.array([[ 1./2+2./3,      -1./3,      -1./2,         0,         0,         0],
+                                                    [     -1./3,  1./2+2./3,          0,     -1./2,         0,         0],
+                                                    [     -1./2,          0,  2./2+2./3,     -1./3,     -1./2,         0],
+                                                    [         0,      -1./2,      -1./3, 2./2+2./3,         0,     -1./2],
+                                                    [         0,          0,      -1./2,         0, 2./2+2./3,     -1./3],
+                                                    [         0,          0,          0,     -1./2,     -1./3, 2./2+2./3]])))
+        
 if __name__ == '__main__':
     unittest.main()
