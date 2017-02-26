@@ -357,7 +357,46 @@ class elementCorrector:
                          np.sum((deltaMaxNormTPrime**2)*muTPrime)
 
         return np.sqrt(epsilonTSquare)
+
+    def computeErrorIndicatorFine(self, coefficientNew):
+        assert(hasattr(self, 'fsi'))
+
+        NPatchCoarse = self.NPatchCoarse
+        world = self.world
+        NCoarseElement = world.NCoarseElement
+        NPatchFine = NPatchCoarse*NCoarseElement
+
+        ALocFine = world.ALocFine
+        P = world.localBasis
+
+        aTilde = self.fsi.coefficient.aFine
+        a = coefficientNew.aFine
+
+        TFinetIndexMap = util.lowerLeftpIndexMap(NCoarseElement-1, NPatchFine-1)
+        iElementPatchFine = self.iElementPatchCoarse*NCoarseElement
+        TFinetStartIndex = util.convertpCoordinateToIndex(NPatchFine-1, iElementPatchFine)
+
+        b = ((aTilde - a)**2)/a
+        bT = b[TFinetStartIndex + TFinetIndexMap]
+        PatchNorm = fem.assemblePatchMatrix(NPatchFine, ALocFine, b)
+        TNorm = fem.assemblePatchMatrix(NCoarseElement, ALocFine, bT)
         
+        BNorm = fem.assemblePatchMatrix(NCoarseElement, ALocFine, a[TFinetStartIndex + TFinetIndexMap])
+
+        TFinepIndexMap = util.lowerLeftpIndexMap(NCoarseElement, NPatchFine)
+        TFinepStartIndex = util.convertpCoordinateToIndex(NPatchFine, iElementPatchFine)
+
+        Q = np.column_stack(self.fsi.correctorsList)
+        QT = Q[TFinepStartIndex + TFinepIndexMap,:]
+
+        A = np.dot((P-QT).T, TNorm*(P-QT)) + np.dot(Q.T, PatchNorm*Q)
+        B = np.dot(P.T, BNorm*P)
+
+        eigenvalues = scipy.linalg.eigvals(A[:-1,:-1], B[:-1,:-1])
+        epsilonTSquare = np.max(np.real(eigenvalues))
+
+        return np.sqrt(epsilonTSquare)
+    
 # def computeelementCorrectorDirichletBC(NPatchCoarse,
 #                                        NCoarseElement,
 #                                        iElementCoarse,

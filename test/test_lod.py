@@ -278,9 +278,18 @@ class corrector_TestCase(unittest.TestCase):
         rCoarseSecond = np.array(rCoarseFirst)
         self.assertTrue(np.isclose(ec.computeErrorIndicator(rCoarseSecond), 0))
 
+        coefSecond = coef.coefficientCoarseFactor(NWorldCoarse, NCoarseElement, aBase, rCoarseSecond)
+        self.assertTrue(np.isclose(ec.computeErrorIndicatorFine(coefSecond), 0))
+        
         # If rCoarseSecond is not rCoarseFirst, the error indicator should not be zero
         rCoarseSecond = 2*np.array(rCoarseFirst)
         self.assertTrue(ec.computeErrorIndicator(rCoarseSecond) >= 0.1)
+
+        coefSecond = coef.coefficientCoarseFactor(NWorldCoarse, NCoarseElement, aBase, rCoarseSecond)
+        self.assertTrue(ec.computeErrorIndicatorFine(coefSecond) >= 0.1)
+
+        # Fine should be smaller than coarse estimate
+        self.assertTrue(ec.computeErrorIndicatorFine(coefSecond) < ec.computeErrorIndicator(rCoarseSecond))
 
         # If rCoarseSecond is different in the element itself, the error
         # indicator should be large
@@ -289,6 +298,11 @@ class corrector_TestCase(unittest.TestCase):
         rCoarseSecond[elementCoarseIndex] *= 2
         saveForNextTest = ec.computeErrorIndicator(rCoarseSecond)
         self.assertTrue(saveForNextTest >= 0.1)
+
+        coefSecond = coef.coefficientCoarseFactor(NWorldCoarse, NCoarseElement, aBase, rCoarseSecond)
+        fineResult = ec.computeErrorIndicatorFine(coefSecond)
+        self.assertTrue(fineResult >= 0.1)
+        self.assertTrue(ec.computeErrorIndicatorFine(coefSecond) < ec.computeErrorIndicator(rCoarseSecond))
 
         # A difference in the perifery should be smaller than in the center
         rCoarseSecond = np.array(rCoarseFirst)
