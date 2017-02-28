@@ -58,10 +58,17 @@ class PetrovGalerkinLOD:
 
             ageList[TInd] += 1
             iElement = util.convertpIndexToCoordinate(world.NWorldCoarse-1, TInd)
-            if ecList[TInd] is not None  and  hasattr(coefficient, 'rCoarse'):
+            if ecList[TInd] is not None:
                 ecT = ecList[TInd]
-                coefficientPatch = coefficient.localize(ecT.iPatchWorldCoarse, ecT.NPatchCoarse)
-                epsilonT = ecList[TInd].computeErrorIndicator(coefficientPatch.rCoarse)
+                if hasattr(coefficient, 'rCoarse'):
+                    coefficientPatch = coefficient.localize(ecT.iPatchWorldCoarse, ecT.NPatchCoarse)
+                    epsilonT = ecList[TInd].computeErrorIndicator(coefficientPatch.rCoarse)
+                elif hasattr(ecT, 'fsi'):
+                    coefficientPatch = coefficient.localize(ecT.iPatchWorldCoarse, ecT.NPatchCoarse)
+                    epsilonT = ecList[TInd].computeErrorIndicatorFine(coefficientPatch)
+                else:
+                    coefficientPatch = None
+                    epsilonT = np.inf
             else:
                 coefficientPatch = None
                 epsilonT = np.inf
