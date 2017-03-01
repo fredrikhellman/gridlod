@@ -13,7 +13,7 @@ except ImportError:
 
 def linSolve(K, c):
     if np.size(K,0) > 2e5:
-        linSolver = 'cg'
+        linSolver = 'spsolve'
     else:
         linSolver = 'spsolve'
 
@@ -28,7 +28,7 @@ def linSolve(K, c):
         def cgCallback(xk):
             print np.linalg.norm(B*xk-d)
         
-        y, info = sparse.linalg.minres(B, d, callback=cgCallback)
+        y, info = sparse.linalg.minres(B, d, tol=1e-9, callback=cgCallback)
         x = DHalfInv*y
     elif linSolver == 'cholesky':
         cholK = cholesky(K)
