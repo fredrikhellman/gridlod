@@ -6,6 +6,11 @@ import sys
 import time
 import util
 
+try:
+    from sksparse.cholmod import cholesky, analyze
+except ImportError:
+    from scikits.sparse.cholmod import cholesky, analyze
+
 def linSolve(K, c):
     if np.size(K,0) > 2e5:
         linSolver = 'cg'
@@ -53,7 +58,6 @@ def saddle(A, B, rhsList):
 
     # Pre-processing (page 12, Engwer, Henning, Malqvist)
     # Rename for brevity
-    from scikits.sparse.cholmod import cholesky
             
     # Compute Y
     print "A"
@@ -369,9 +373,6 @@ def saddleNullSpace(A, B, rhsList, coarseNodes):
     return correctorList
 
 
-from scikits.sparse.cholmod import cholesky
-from scikits.sparse.cholmod import analyze
-            
 def solveWithBlockDiagonalPreconditioner(A, B, bList):
     """Solve saddle point problem with block diagonal preconditioner
 
