@@ -4,7 +4,7 @@ from copy import deepcopy
 
 import lod
 import util
-
+import fem
 
 class PetrovGalerkinLOD:
     def __init__(self, world, k, IPatchGenerator, epsilonTol, printLevel=0):
@@ -52,8 +52,9 @@ class PetrovGalerkinLOD:
         ecList = self.ecList
         ageList = self.ageList
         epsilonList = self.epsilonList
+        recomputeCount = 0
         for TInd in range(NtCoarse):
-            if self.printLevel > 0:
+            if self.printLevel > 1:
                 print str(TInd) + ' / ' + str(NtCoarse),
 
             ageList[TInd] += 1
@@ -75,11 +76,11 @@ class PetrovGalerkinLOD:
 
             epsilonList[TInd] = epsilonT
             
-            if self.printLevel > 0:
+            if self.printLevel > 1:
                 print 'epsilonT = ' + str(epsilonT), 
                 
             if epsilonT > epsilonTol:
-                if self.printLevel > 0:
+                if self.printLevel > 1:
                     print 'C'
                 ecT = lod.elementCorrector(world, k, iElement, saddleSolver)
 
@@ -93,10 +94,14 @@ class PetrovGalerkinLOD:
                     ecT.clearFineQuantities()
                 ecList[TInd] = ecT
                 ageList[TInd] = 0
+                recomputeCount += 1
             else:
-                if self.printLevel > 0:
+                if self.printLevel > 1:
                     print 'N'
 
+        if self.printLevel > 0:
+            print "Recompute fraction", float(recomputeCount)/NtCoarse
+                    
     def clearCorrectors(self):
         NtCoarse = np.prod(self.world.NWorldCoarse)
         self.ecList = None
@@ -153,6 +158,34 @@ class PetrovGalerkinLOD:
             uFine[patchpStartIndex + patchpIndexMap] += correctorT
 
         return uFine
+
+    def computeFaceFluxTF(self, u, f=None):
+        assert(f is None)
+        
+        world = self.world
+        NWorldCoarse = world.NWorldCoarse
+        d = np.size(NWorldCoarse)
+        NtCoarse = np.prod(NWorldCoarse)
+        NpCoarse = np.prod(NWorldCoarse+1)
+        
+        fluxTF = np.zeros([NtCoarse, 2*d])
+        
+        elementpIndexMap = util.elementpIndexMap(NWorldCoarse)
+        elementpStartIndices = util.lowerLeftpIndexMap(NWorldCoarse-1, NWorldCoarse)
+
+        for TInd in np.arange(NtCoarse):
+            ecT = self.ecList[TInd]
+            assert(hasattr(ecT, 'csi'))
+
+            patchtStartIndex = util.convertpCoordinateToIndex(NWorldCoarse-1, ecT.iPatchWorldCoarse)
+            patchtIndexMap = util.lowerLeftpIndexMap(ecT.NPatchCoarse-1, NWorldCoarse-1)
+            elementpIndex = elementpStartIndices[TInd] + elementpIndexMap
+
+            patchtIndices = patchtStartIndex + patchtIndexMap
+            fluxTF[TInd,:] += np.einsum('iF, i -> F', ecT.csi.basisFluxTF, u[elementpIndex])
+            fluxTF[patchtIndices,:] -= np.einsum('iTF, i -> TF', ecT.csi.correctorFluxTF, u[elementpIndex])
+
+        return fluxTF
     
     def assembleBasisCorrectors(self):
         if self.basisCorrectors is not None:
@@ -279,3 +312,26 @@ class PetrovGalerkinLOD:
         self.K = K
         return K
     
+    def solve(self, f, g, boundaryConditions):
+        assert(f is None)
+
+        world = self.world
+        NWorldCoarse = world.NWorldCoarse
+        NpCoarse = np.prod(NWorldCoarse+1)
+        
+        KmsFull = self.assembleMsStiffnessMatrix()
+        MFull = fem.assemblePatchMatrix(NWorldCoarse, world.MLocCoarse)
+        
+        fixed = util.boundarypIndexMap(NWorldCoarse, boundaryConditions==0)
+        free  = np.setdiff1d(np.arange(NpCoarse), fixed)
+        bFull = KmsFull*g
+        
+        KmsFree = KmsFull[free][:,free]
+        bFree = bFull[free]
+
+        uFree = sparse.linalg.spsolve(KmsFree, bFree)
+
+        uFull = np.zeros(NpCoarse)
+        uFull[free] = uFree
+
+        return uFull, uFree

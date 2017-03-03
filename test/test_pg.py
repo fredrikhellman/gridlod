@@ -7,7 +7,7 @@ import os
 
 from pyevtk.hl import imageToVTK 
 
-from gridlod import pg, interp, coef, util, fem, world, linalg, femsolver
+from gridlod import pg, interp, coef, util, fem, world, linalg, femsolver, transport
 from gridlod.world import World
 
 def saveCube(name, data, shape):
@@ -463,6 +463,66 @@ class PetrovGalerkinLOD_TestCase(unittest.TestCase):
         #uFineFull[freeFine] = uFineFree
 
         #np.savetxt('uFineFull', uFineFull)
+        
+    def test_00coarseFlux(self):
+        NWorldFine = np.array([20, 20])
+        NpFine = np.prod(NWorldFine+1)
+        NtFine = np.prod(NWorldFine)
+        NWorldCoarse = np.array([4, 4])
+        NCoarseElement = NWorldFine/NWorldCoarse
+        NtCoarse = np.prod(NWorldCoarse)
+        NpCoarse = np.prod(NWorldCoarse+1)
+        
+        boundaryConditions = np.array([[0, 0],
+                                       [1, 1]])
+        world = World(NWorldCoarse, NCoarseElement, boundaryConditions)
+
+        np.random.seed(0)
+        
+        aBaseSquare = np.exp(5*np.random.random_sample(NWorldFine[1]))
+        aBaseCube = np.tile(aBaseSquare[...,np.newaxis], [NWorldFine[0],1])
+        aBaseCube = aBaseCube[...,np.newaxis]
+
+        aBase = aBaseCube.flatten()
+
+        IPatchGenerator = lambda i, N: interp.L2ProjectionPatchMatrix(i, N, NWorldCoarse, NCoarseElement, boundaryConditions)
+        
+        aCoef = coef.coefficientFine(NWorldCoarse, NCoarseElement, aBase)
+        
+        k = 4
+        printLevel = 0
+        pglod = pg.PetrovGalerkinLOD(world, k, IPatchGenerator, 0, printLevel)
+        pglod.updateCorrectors(aCoef)
+
+        KmsFull = pglod.assembleMsStiffnessMatrix()
+
+        coords = util.pCoordinates(NWorldCoarse)
+        xC = coords[:,0]
+        g = 1-xC
+        bFull = -KmsFull*g
+
+        boundaryMap = boundaryConditions==0
+        fixed = util.boundarypIndexMap(NWorldCoarse, boundaryMap)
+        free = np.setdiff1d(np.arange(0,NpCoarse), fixed)
+        KmsFree = KmsFull[free][:,free]
+        
+        bFree = bFull[free]
+        xFree = sparse.linalg.spsolve(KmsFree, bFree)
+        xFull = np.zeros(NpCoarse)
+        xFull[free] = xFree
+        uFull = xFull+g
+
+        lodFluxTF = pglod.computeFaceFluxTF(uFull)
+
+        ## Compute fine solution
+        coords = util.pCoordinates(NWorldFine)
+        xF = coords[:,0]
+        gFine = 1-xF
+        uFineFull, AFine, _ = femsolver.solveFine(world, aBase, None, -gFine, boundaryConditions)
+        uFineFull = uFineFull+gFine
+        fineFluxTF = transport.computeHarmonicMeanFaceFlux(NWorldCoarse, NWorldCoarse, NCoarseElement, aBase, uFineFull)
+
+        self.assertTrue(np.allclose(lodFluxTF, fineFluxTF, rtol=1e-7))
         
 if __name__ == '__main__':
     #import cProfile

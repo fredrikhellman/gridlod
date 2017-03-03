@@ -8,6 +8,7 @@ import fem
 import util
 import linalg
 import coef
+import transport
 
 # Saddle point problem solvers
 class nullspaceSolver:
@@ -145,12 +146,14 @@ class elementCorrector:
             self.correctorsList = correctorsList
 
     class CoarseScaleInformation:
-        def __init__(self, Kij, Kmsij, muTPrime, rCoarse=None):
+        def __init__(self, Kij, Kmsij, muTPrime, correctorFluxTF, basisFluxTF, rCoarse=None):
             self.Kij = Kij
             self.Kmsij = Kmsij
             #self.LTPrimeij = LTPrimeij
             self.muTPrime = muTPrime
             self.rCoarse = rCoarse
+            self.correctorFluxTF = correctorFluxTF
+            self.basisFluxTF = basisFluxTF
 
     @property
     def saddleSolver(self):
@@ -291,6 +294,8 @@ class elementCorrector:
         TPrimeFinepIndexMap = util.lowerLeftpIndexMap(NCoarseElement, NPatchFine)
 
         TInd = util.convertpCoordinateToIndex(NPatchCoarse-1, self.iElementPatchCoarse)
+
+        QPatch = np.column_stack(correctorsList)
         
         # This loop can probably be done faster than this. If a bottle-neck, fix!
         Kmsij = np.zeros((NpPatchCoarse, 2**d))
@@ -303,11 +308,11 @@ class elementCorrector:
                     TPrimeCoarsepStartIndices,
                     TPrimeFinetStartIndices,
                     TPrimeFinepStartIndices):
-            
-            KTPrime = fem.assemblePatchMatrix(NCoarseElement, ALocFine, aPatch[TPrimeFinetStartIndex +
-                                                                           TPrimeFinetIndexMap])
+
+            aTPrime = aPatch[TPrimeFinetStartIndex + TPrimeFinetIndexMap]
+            KTPrime = fem.assemblePatchMatrix(NCoarseElement, ALocFine, aTPrime)
             P = localBasis
-            Q = np.column_stack([corrector[TPrimeFinepStartIndex + TPrimeFinepIndexMap] for corrector in correctorsList])
+            Q = QPatch[TPrimeFinepStartIndex + TPrimeFinepIndexMap,:]
             BTPrimeij = np.dot(P.T, KTPrime*Q)
             CTPrimeij = np.dot(Q.T, KTPrime*Q)
             sigma = TPrimeCoarsepStartIndex + TPrimeCoarsepIndexMap
@@ -318,6 +323,7 @@ class elementCorrector:
                                        - BTPrimeij.T \
                                        + Kij
                 Kmsij[sigma,:] += Kij - BTPrimeij
+                
             else:
                 LTPrimeij[TPrimeInd] = CTPrimeij
                 Kmsij[sigma,:] += -BTPrimeij
@@ -328,11 +334,26 @@ class elementCorrector:
             eigenvalues = scipy.linalg.eigvals(LTPrimeij[TPrimeInd][:-1,:-1], Kij[:-1,:-1])
             muTPrime[TPrimeInd] = np.max(np.real(eigenvalues))
 
+        # Compute coarse element face flux for basis and Q (not yet implemented for R)
+        correctorFluxTF = transport.computeHarmonicMeanFaceFlux(world.NWorldCoarse,
+                                                                NPatchCoarse,
+                                                                NCoarseElement, aPatch, QPatch)
+
+        # Need to compute over at least one fine element over the
+        # boundary of the main element to make the harmonic average
+        # right.  Note: We don't do this for correctorFluxTF, beause
+        # we do not have access to a outside the patch...
+        localBasisExtended = np.zeros_like(QPatch)
+        localBasisExtended[TPrimeFinepStartIndices[TInd] + TPrimeFinepIndexMap,:] = localBasis
+        basisFluxTF = transport.computeHarmonicMeanFaceFlux(world.NWorldCoarse,
+                                                            NPatchCoarse,
+                                                            NCoarseElement, aPatch, localBasisExtended)[:,TInd,:]
+
         if isinstance(self.fsi.coefficient, coef.coefficientCoarseFactorAbstract):
             rCoarse = self.fsi.coefficient.rCoarse
         else:
             rCoarse = None
-        self.csi = self.CoarseScaleInformation(Kij, Kmsij, muTPrime, rCoarse)
+        self.csi = self.CoarseScaleInformation(Kij, Kmsij, muTPrime, correctorFluxTF, basisFluxTF, rCoarse)
 
     def clearFineQuantities(self):
         assert(hasattr(self, 'fsi'))

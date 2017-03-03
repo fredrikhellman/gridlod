@@ -119,12 +119,22 @@ def harmonicMeanOverFaces(NPatchCoarse, NCoarseElement, k, boundary, aPatch):
     return abFaces
 
 def computeHarmonicMeanFaceFlux(NWorldCoarse, NPatchCoarse, NCoarseElement, aPatch, uPatch):
+    # uPatch can be a 2D-array: n x NpPatch, to compute the face flux for several
+    # functions simultaneously
+    if uPatch.ndim == 1:
+        squeezeResult = True
+        uPatch = uPatch[...,None]
+    else:
+        squeezeResult = False
+
+    assert(uPatch.ndim == 2)
+    
     NWorldFine = NWorldCoarse*NCoarseElement
     
     NtCoarse = np.prod(NPatchCoarse)
     d = np.size(NWorldCoarse)
     
-    fluxTF = np.zeros([NtCoarse, 2*d])
+    fluxTF = np.zeros([uPatch.shape[1], NtCoarse, 2*d])
     
     CLocGetter = fem.localBoundaryNormalDerivativeMatrixGetter(NWorldFine)
     for k in range(d):
@@ -136,10 +146,13 @@ def computeHarmonicMeanFaceFlux(NWorldCoarse, NPatchCoarse, NCoarseElement, aPat
             aFaces = harmonicMeanOverFaces(NPatchCoarse, NCoarseElement, k, boundary, aPatch)
 
             pIndices = faceElementPointIndices(NPatchCoarse, NCoarseElement, k, boundary)
-            uFaces = uPatch[pIndices]
+            uFaces = uPatch[pIndices,...]
 
-            fluxTF[:,2*k+boundary] = -np.einsum('Tfp, kp, Tf -> T', uFaces, B, aFaces)
+            fluxTF[...,2*k+boundary] = -np.einsum('Tfpi, kp, Tf -> iT', uFaces, B, aFaces)
 
+    if squeezeResult:
+        fluxTF = fluxTF[0,...]
+            
     return fluxTF
     
 def computeElementFaceFlux(NWorldCoarse, NPatchCoarse, NCoarseElement, aPatch, uPatch):
