@@ -79,7 +79,7 @@ class PetrovGalerkinLOD:
             if self.printLevel > 1:
                 print 'epsilonT = ' + str(epsilonT), 
                 
-            if epsilonT > epsilonTol:
+            if epsilonT == np.inf or epsilonT > epsilonTol:
                 if self.printLevel > 1:
                     print 'C'
                 ecT = lod.elementCorrector(world, k, iElement, saddleSolver)
@@ -320,7 +320,7 @@ class PetrovGalerkinLOD:
         NpCoarse = np.prod(NWorldCoarse+1)
         
         KmsFull = self.assembleMsStiffnessMatrix()
-        MFull = fem.assemblePatchMatrix(NWorldCoarse, world.MLocCoarse)
+        #MFull = fem.assemblePatchMatrix(NWorldCoarse, world.MLocCoarse)
         
         fixed = util.boundarypIndexMap(NWorldCoarse, boundaryConditions==0)
         free  = np.setdiff1d(np.arange(NpCoarse), fixed)
@@ -335,3 +335,35 @@ class PetrovGalerkinLOD:
         uFull[free] = uFree
 
         return uFull, uFree
+
+    def solveTrueCoefficient(self, f, g, boundaryConditions, aFine):
+        assert(f is None)
+
+        world = self.world
+        NWorldCoarse = world.NWorldCoarse
+        NCoarseElement = world.NCoarseElement
+        NWorldFine = NWorldCoarse*NCoarseElement
+        NpCoarse = np.prod(NWorldCoarse+1)
+        
+        basis = fem.assembleProlongationMatrix(NWorldCoarse, NCoarseElement)
+        basisCorrectors = self.assembleBasisCorrectors()
+        modifiedBasis = basis - basisCorrectors
+
+        AFine = fem.assemblePatchMatrix(NWorldFine, world.ALocFine, aFine)
+        
+        KmsFull = basis.T*(AFine*modifiedBasis)
+        
+        fixed = util.boundarypIndexMap(NWorldCoarse, boundaryConditions==0)
+        free  = np.setdiff1d(np.arange(NpCoarse), fixed)
+        bFull = KmsFull*g
+        
+        KmsFree = KmsFull[free][:,free]
+        bFree = bFull[free]
+
+        uFree = sparse.linalg.spsolve(KmsFree, bFree)
+
+        uFull = np.zeros(NpCoarse)
+        uFull[free] = uFree
+
+        return uFull, uFree, modifiedBasis
+    
