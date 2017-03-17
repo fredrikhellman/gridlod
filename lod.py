@@ -120,6 +120,21 @@ def ritzProjectionToFinePatchWithGivenSaddleSolver(world,
 
     return projectionsList
 
+class FineScaleInformation:
+    def __init__(self, coefficientPatch, correctorsList):
+        self.coefficient = coefficientPatch
+        self.correctorsList = correctorsList
+
+class CoarseScaleInformation:
+    def __init__(self, Kij, Kmsij, muTPrime, correctorFluxTF, basisFluxTF, rCoarse=None):
+        self.Kij = Kij
+        self.Kmsij = Kmsij
+        #self.LTPrimeij = LTPrimeij
+        self.muTPrime = muTPrime
+        self.rCoarse = rCoarse
+        self.correctorFluxTF = correctorFluxTF
+        self.basisFluxTF = basisFluxTF
+
 class elementCorrector:
     def __init__(self, world, k, iElementWorldCoarse, saddleSolver=None):
         self.k = k
@@ -140,21 +155,6 @@ class elementCorrector:
         else:
             self._saddleSolver = saddleSolver
             
-    class FineScaleInformation:
-        def __init__(self, coefficientPatch, correctorsList):
-            self.coefficient = coefficientPatch
-            self.correctorsList = correctorsList
-
-    class CoarseScaleInformation:
-        def __init__(self, Kij, Kmsij, muTPrime, correctorFluxTF, basisFluxTF, rCoarse=None):
-            self.Kij = Kij
-            self.Kmsij = Kmsij
-            #self.LTPrimeij = LTPrimeij
-            self.muTPrime = muTPrime
-            self.rCoarse = rCoarse
-            self.correctorFluxTF = correctorFluxTF
-            self.basisFluxTF = basisFluxTF
-
     @property
     def saddleSolver(self):
         return self._saddleSolver
@@ -248,7 +248,7 @@ class elementCorrector:
 
         correctorsList = self.computeElementCorrector(coefficientPatch, IPatch, ARhsList)
         
-        self.fsi = self.FineScaleInformation(coefficientPatch, correctorsList)
+        self.fsi = FineScaleInformation(coefficientPatch, correctorsList)
         
     def computeCoarseQuantities(self):
         '''Compute the coarse quantities K and L for this element corrector
@@ -353,7 +353,7 @@ class elementCorrector:
             rCoarse = self.fsi.coefficient.rCoarse
         else:
             rCoarse = None
-        self.csi = self.CoarseScaleInformation(Kij, Kmsij, muTPrime, correctorFluxTF, basisFluxTF, rCoarse)
+        self.csi = CoarseScaleInformation(Kij, Kmsij, muTPrime, correctorFluxTF, basisFluxTF, rCoarse)
 
     def clearFineQuantities(self):
         assert(hasattr(self, 'fsi'))
@@ -373,7 +373,7 @@ class elementCorrector:
         rCoarse = self.csi.rCoarse
         muTPrime = self.csi.muTPrime
         deltaMaxNormTPrime = np.abs((rCoarseNew - rCoarse)/np.sqrt(rCoarseNew*rCoarse))
-
+        
         epsilonTSquare = rCoarseNew[elementCoarseIndex]/rCoarse[elementCoarseIndex] * \
                          np.sum((deltaMaxNormTPrime**2)*muTPrime)
 
