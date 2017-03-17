@@ -51,14 +51,17 @@ class PetrovGalerkinLOD:
         if self.epsilonList is None:
             self.epsilonList = [np.nan]*NtCoarse
 
-
+        if self.printLevel >= 2:
+            print 'Setting up workers'
         eccontroller.setupWorker(world, coefficient, IPatchGenerator, k, clearFineQuantities)
+        if self.printLevel >= 2:
+            print 'Done'
             
         ecList = self.ecList
         ageList = self.ageList
         epsilonList = self.epsilonList
         recomputeCount = 0
-        ecResultList = []
+        ecComputeList = []
         for TInd in range(NtCoarse):
             if self.printLevel >= 3:
                 print str(TInd) + ' / ' + str(NtCoarse),
@@ -88,9 +91,7 @@ class PetrovGalerkinLOD:
             if epsilonT == np.inf or epsilonT > epsilonTol:
                 if self.printLevel >= 3:
                     print 'C'
-
-                ecResult = eccontroller.enqueue(np.array(iElement))
-                ecResultList.append((TInd, ecResult))
+                ecComputeList.append((TInd, iElement))
                 ecList[TInd] = None
                 ageList[TInd] = 0
                 recomputeCount += 1
@@ -101,16 +102,10 @@ class PetrovGalerkinLOD:
         if self.printLevel >= 2:
             print 'Waiting for results', len(ecResultList)
 
-        resultCounter = 0
-        for TInd, ecResult in ecResultList:
-            if self.printLevel >= 2:
-                print str(TInd) + ' : ' + str(resultCounter) + ' / ' + str(len(ecResultList))
-            ecList[TInd] = ecResult.get()
-            resultCounter += 1
+        ecResultList = eccontroller.mapComputations(ecComputeList, self.printLevel)
+        for ecResult, ecCompute in zip(ecResultList, ecComputeList):
+            ecList[ecCompute[0]] = ecResult
 
-        if self.printLevel >= 2:
-            print 'Done'
-            
         if self.printLevel > 0:
             print "Recompute fraction", float(recomputeCount)/NtCoarse
                     

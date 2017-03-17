@@ -1,43 +1,39 @@
 client = None
 lview = None
+sendAr = None
 
 import ecworker
 
-class ParallelResult:
-    def __init__(self, ar, iElement):
-        self.ar = ar
-        self.iElement = iElement
-        
-    def get(self):
-        #ecT = ecworker.computeElementCorrector(self.iElement)
-        #        self.ar.wait()
-        #        return ecT
-        return self.ar.get()[0]
+def mapComputations(ecComputeList, printLevel=0):
+    if len(ecComputeList) == 0:
+        return []
     
-class LazyResult:
-    def __init__(self, iElement):
-        self.iElement = iElement
-        
-    def get(self):
-        ecT = ecworker.computeElementCorrector(self.iElement)
-        return ecT
-
-def enqueue(iElement):
     if not client:
-        return LazyResult(iElement)
+        resultCounter = 0
+        ecTList = []
+        for TInd, iElement in ecComputeList:
+            if printLevel >= 2:
+                print str(TInd) + ' : ' + str(resultCounter) + ' / ' + str(len(ecComputeList))
+            ecT = ecworker.computeElementCorrector(iElement)
+            ecTList.append(ecT)
+            resultCounter += 1
+        if printLevel >= 2:
+            print 'Done'
+        return ecTList
     else:
-        computeElementCorrector = lambda x: ecworker.computeElementCorrector(x)
-        ar = lview.map(computeElementCorrector, [iElement])
-        ar.wait()
-        return ParallelResult(ar, iElement)
-    
+        sendAr.wait()
+        computeElementCorrector = lambda ecCompute: ecworker.computeElementCorrector(ecCompute[1])
+        ar = lview.map(computeElementCorrector, ecComputeList)
+        ar.wait_interactive()
+        return ar.get()
+
 def setupWorker(world, coefficient, IPatchGenerator, k, clearFineQuantities):
     if not client:
         ecworker.setupWorker(world, coefficient, IPatchGenerator, k, clearFineQuantities)
     else:
+        global sendAr
         setupWorkerWrapper = lambda x: ecworker.setupWorker(*x)
-        ar = client[:].apply_async(setupWorkerWrapper, (world, coefficient, None, k, clearFineQuantities))
-        ar.wait()
+        sendAr = client[:].apply_async(setupWorkerWrapper, (world, coefficient, None, k, clearFineQuantities))
         
 def setupClient(clientIn):
     global client, lview
