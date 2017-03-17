@@ -1,5 +1,7 @@
 import lod
 import interp
+import coef
+
 from copy import deepcopy
 
 world = None
@@ -8,12 +10,33 @@ saddleSolver = None
 k = None
 IPatchGenerator = None
 clearFineQuantities = None
+aBase = None
 
+def clearWorker():
+    global world, coefficient, saddleSolver, IPatchGenerator, k, clearFineQuantities, aBase
+    world = None
+    coefficient = None
+    saddleSolver = None
+    k = None
+    IPatchGenerator = None
+    clearFineQuantities = None
+    aBase = None
+    
+def hasaBase():
+    return aBase is not None
+
+def sendar(aBaseIn, rCoarseIn):
+    global aBase, coefficient
+    if aBaseIn is not None:
+        aBase = aBaseIn
+    coefficient = coef.coefficientCoarseFactor(world.NWorldCoarse, world.NCoarseElement, aBase, rCoarseIn)
+    
 def setupWorker(worldIn, coefficientIn, IPatchGeneratorIn, kIn, clearFineQuantitiesIn):
     global world, coefficient, saddleSolver, IPatchGenerator, k, clearFineQuantities
 
     world = worldIn
-    coefficient = coefficientIn
+    if coefficientIn is not None:
+        coefficient = coefficientIn
     saddleSolver = lod.schurComplementSolver(world.NWorldCoarse*world.NCoarseElement)
     k = kIn
     if IPatchGeneratorIn is not None:

@@ -24,6 +24,8 @@ class PetrovGalerkinLOD:
         self.K = None
         self.basisCorrectors = None
         self.coefficient = None
+
+        eccontroller.clearWorkers()
         
     def updateCorrectors(self, coefficient, clearFineQuantities=True):
         world = self.world
@@ -53,7 +55,7 @@ class PetrovGalerkinLOD:
 
         if self.printLevel >= 2:
             print 'Setting up workers'
-        eccontroller.setupWorker(world, coefficient, IPatchGenerator, k, clearFineQuantities)
+        eccontroller.setupWorker(world, coefficient, IPatchGenerator, k, clearFineQuantities, self.printLevel)
         if self.printLevel >= 2:
             print 'Done'
             
