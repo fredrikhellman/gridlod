@@ -11,6 +11,11 @@ class coefficientCoarseFactorAbstract:
     @property
     def rCoarse(self):
         raise(NotImplementedError('Abstract class'))
+
+class coefficientWithLaggingAbstract:
+    @property
+    def aLagging(self):
+        raise(NotImplementedError('Abstract class'))
     
     
 class coefficientFine(coefficientAbstract):
@@ -39,6 +44,39 @@ class coefficientFine(coefficientAbstract):
     def aFine(self):
         return self._aFine
 
+class coefficientFineWithLagging(coefficientWithLaggingAbstract):
+    def __init__(self, NPatchCoarse, NCoarseElement, aFine, aLagging):
+        self.NPatchCoarse = np.array(NPatchCoarse)
+        self.NCoarseElement = NCoarseElement
+        self._aFine = aFine
+        self._aLagging = aLagging
+        assert(np.size(aFine) == np.prod(NPatchCoarse*NCoarseElement))
+
+    def localize(self, iSubPatchCoarse, NSubPatchCoarse):
+        NPatchCoarse = self.NPatchCoarse
+        NCoarseElement = self.NCoarseElement
+        NPatchFine = NPatchCoarse*NCoarseElement
+        NSubPatchFine = NSubPatchCoarse*NCoarseElement
+        iSubPatchFine = iSubPatchCoarse*NCoarseElement
+
+        # a
+        coarsetIndexMap = util.lowerLeftpIndexMap(NSubPatchFine-1, NPatchFine-1)
+        coarsetStartIndex = util.convertpCoordinateToIndex(NPatchFine-1, iSubPatchFine)
+        aFineLocalized = self._aFine[coarsetStartIndex + coarsetIndexMap]
+        aLaggingLocalized = self._aLagging[coarsetStartIndex + coarsetIndexMap]
+
+        localizedCoefficient = coefficientFineWithLagging(NSubPatchCoarse, NCoarseElement,
+                                                          aFineLocalized, aLaggingLocalized)
+        return localizedCoefficient
+
+    @property
+    def aFine(self):
+        return self._aFine
+
+    @property
+    def aLagging(self):
+        return self._aFine
+    
 class coefficientCoarseFactor(coefficientAbstract, coefficientCoarseFactorAbstract):
     def __init__(self, NPatchCoarse, NCoarseElement, aBase, rCoarse):
         self.NPatchCoarse = np.array(NPatchCoarse)

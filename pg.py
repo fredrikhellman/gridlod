@@ -72,6 +72,9 @@ class PetrovGalerkinLOD:
             iElement = util.convertpIndexToCoordinate(world.NWorldCoarse-1, TInd)
             if ecList[TInd] is not None:
                 ecT = ecList[TInd]
+                if hasattr(coefficient, 'aLagging'):
+                    coefficientPatch = coefficient.localize(ecT.iPatchWorldCoarse, ecT.NPatchCoarse)
+                    epsilonT = ecList[TInd].computeErrorIndicatorFineWithLagging(coefficientPatch.aFine, coefficientPatch.aLagging)
                 if hasattr(coefficient, 'rCoarse'):
                     coefficientPatch = coefficient.localize(ecT.iPatchWorldCoarse, ecT.NPatchCoarse)
                     epsilonT = ecList[TInd].computeErrorIndicator(coefficientPatch.rCoarse)
@@ -102,7 +105,7 @@ class PetrovGalerkinLOD:
                     print 'N'
 
         if self.printLevel >= 2:
-            print 'Waiting for results', len(ecResultList)
+            print 'Waiting for results', len(ecComputeList)
 
         ecResultList = eccontroller.mapComputations(ecComputeList, self.printLevel)
         for ecResult, ecCompute in zip(ecResultList, ecComputeList):

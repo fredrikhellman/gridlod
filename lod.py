@@ -382,6 +382,12 @@ class elementCorrector:
     def computeErrorIndicatorFine(self, coefficientNew):
         assert(hasattr(self, 'fsi'))
 
+        a = coefficientNew.aFine
+        aTilde = self.fsi.coefficient.aFine
+
+        return self.computeErrorIndicatorFineWithLagging(a, aTilde)
+        
+    def computeErrorIndicatorFineWithLagging(self, a, aTilde):
         NPatchCoarse = self.NPatchCoarse
         world = self.world
         NCoarseElement = world.NCoarseElement
@@ -389,9 +395,6 @@ class elementCorrector:
 
         ALocFine = world.ALocFine
         P = world.localBasis
-
-        aTilde = self.fsi.coefficient.aFine
-        a = coefficientNew.aFine
 
         TFinetIndexMap = util.lowerLeftpIndexMap(NCoarseElement-1, NPatchFine-1)
         iElementPatchFine = self.iElementPatchCoarse*NCoarseElement
