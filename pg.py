@@ -75,7 +75,7 @@ class PetrovGalerkinLOD:
                 if hasattr(coefficient, 'aLagging'):
                     coefficientPatch = coefficient.localize(ecT.iPatchWorldCoarse, ecT.NPatchCoarse)
                     epsilonT = ecList[TInd].computeErrorIndicatorFineWithLagging(coefficientPatch.aFine, coefficientPatch.aLagging)
-                if hasattr(coefficient, 'rCoarse'):
+                elif hasattr(coefficient, 'rCoarse'):
                     coefficientPatch = coefficient.localize(ecT.iPatchWorldCoarse, ecT.NPatchCoarse)
                     epsilonT = ecList[TInd].computeErrorIndicator(coefficientPatch.rCoarse)
                 elif hasattr(ecT, 'fsi'):

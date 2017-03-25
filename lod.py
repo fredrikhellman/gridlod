@@ -359,6 +359,34 @@ class elementCorrector:
         assert(hasattr(self, 'fsi'))
         del self.fsi
 
+    def computeErrorIndicatorFineWithLagging(self, a, aTilde):
+        assert(hasattr(self, 'csi'))
+
+        world = self.world
+        NPatchCoarse = self.NPatchCoarse
+        NCoarseElement = world.NCoarseElement
+        NPatchFine = NPatchCoarse*NCoarseElement
+        iElementPatchCoarse = self.iElementPatchCoarse
+
+        elementCoarseIndex = util.convertpCoordinateToIndex(NPatchCoarse-1, iElementPatchCoarse)
+        
+        TPrimeFinetStartIndices = util.pIndexMap(NPatchCoarse-1, NPatchFine-1, NCoarseElement)
+        TPrimeFinetIndexMap = util.lowerLeftpIndexMap(NCoarseElement-1, NPatchFine-1)
+
+        muTPrime = self.csi.muTPrime
+
+        TPrimeIndices = np.add.outer(TPrimeFinetStartIndices, TPrimeFinetIndexMap)
+        aTPrime = a[TPrimeIndices]
+        aTildeTPrime = aTilde[TPrimeIndices]
+        
+        deltaMaxNormTPrime = np.max(np.abs((aTPrime - aTildeTPrime)/np.sqrt(aTPrime*aTildeTPrime)), axis=1)
+        theOtherUnnamedFactorTPrime = np.max(np.abs(aTPrime[elementCoarseIndex]/aTildeTPrime[elementCoarseIndex]))
+
+        epsilonTSquare = theOtherUnnamedFactorTPrime * \
+                         np.sum((deltaMaxNormTPrime**2)*muTPrime)
+
+        return np.sqrt(epsilonTSquare)
+        
     def computeErrorIndicator(self, rCoarseNew):
         assert(hasattr(self, 'csi'))
         assert(self.csi.rCoarse is not None)
@@ -382,12 +410,6 @@ class elementCorrector:
     def computeErrorIndicatorFine(self, coefficientNew):
         assert(hasattr(self, 'fsi'))
 
-        a = coefficientNew.aFine
-        aTilde = self.fsi.coefficient.aFine
-
-        return self.computeErrorIndicatorFineWithLagging(a, aTilde)
-        
-    def computeErrorIndicatorFineWithLagging(self, a, aTilde):
         NPatchCoarse = self.NPatchCoarse
         world = self.world
         NCoarseElement = world.NCoarseElement
@@ -395,6 +417,9 @@ class elementCorrector:
 
         ALocFine = world.ALocFine
         P = world.localBasis
+
+        a = coefficientNew.aFine
+        aTilde = self.fsi.coefficient.aFine
 
         TFinetIndexMap = util.lowerLeftpIndexMap(NCoarseElement-1, NPatchFine-1)
         iElementPatchFine = self.iElementPatchCoarse*NCoarseElement

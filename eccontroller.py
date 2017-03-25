@@ -34,9 +34,7 @@ def setupWorker(world, coefficient, IPatchGenerator, k, clearFineQuantities, pri
     else:
         global sendAr
         setupWorkerWrapper = lambda x: ecworker.setupWorker(*x)
-        if not hasattr(coefficient, 'rCoarse'):
-            sendAr = client[:].apply_async(setupWorkerWrapper, (world, coefficient, None, k, clearFineQuantities))
-        else:
+        if hasattr(coefficient, 'rCoarse'):
             ar = client[:].apply_async(setupWorkerWrapper, (world, None, None, k, clearFineQuantities))
             ar.wait()
             ar = client[:].apply_async(ecworker.hasaBase)
@@ -49,6 +47,14 @@ def setupWorker(world, coefficient, IPatchGenerator, k, clearFineQuantities, pri
                 if printLevel >= 2:
                     print 'Sending small coefficient'
                 sendAr = client[:].apply_async(ecworker.sendar, None, coefficient._rCoarse)
+        elif hasattr(coefficient, 'aLagging'):
+            ar = client[:].apply_async(setupWorkerWrapper, (world, None, None, k, clearFineQuantities))
+            ar.wait()
+            if printLevel >= 2:
+                print 'Sending both coefficients'
+            sendAr = client[:].apply_async(ecworker.sendas, coefficient._aFine, coefficient._aLagging)
+        else:
+            sendAr = client[:].apply_async(setupWorkerWrapper, (world, coefficient, None, k, clearFineQuantities))
 
 def clearWorkers():
     if not client:

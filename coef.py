@@ -75,7 +75,7 @@ class coefficientFineWithLagging(coefficientWithLaggingAbstract):
 
     @property
     def aLagging(self):
-        return self._aFine
+        return self._aLagging
     
 class coefficientCoarseFactor(coefficientAbstract, coefficientCoarseFactorAbstract):
     def __init__(self, NPatchCoarse, NCoarseElement, aBase, rCoarse):
