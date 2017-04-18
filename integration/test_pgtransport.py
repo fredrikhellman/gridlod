@@ -9,7 +9,7 @@ import sys
 import matplotlib.pyplot as plt
 from pyevtk.hl import imageToVTK 
 
-from gridlod import pg, transport, nodeflux, interp, coef, util, fem, world, linalg, femsolver
+from gridlod import pg, transport, interp, coef, util, fem, world, linalg, femsolver
 from gridlod.world import World
 
 def drawCoefficient(N, a):
