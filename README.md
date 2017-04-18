@@ -63,7 +63,7 @@ several routines for constructing subpatches or finding a
 lexicographical index from a cartesian coordinate and so on. The basis
 of many routines is `pIndexMap`.
 
-## File structure
+## Files
 
 The base consists of these files:
 * `fem.py` contains code for the assembly of finite element matrices.
