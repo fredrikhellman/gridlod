@@ -80,3 +80,8 @@ The application in *Numerical homogenization of time-dependent
 diffusion* (arXiv:1703.08857) is defined by the following files.
 * `pg.py` contains code for the main algorithm in that paper.
 * `ecworker.py` and `eccontroller.py` contains a hack that parallelizes computations over an ipyparallel cluster.
+
+## Tests
+
+The test and integration directories contain some tests that can be
+illustrative. Use e.g. `nosetests` to run the tests.
