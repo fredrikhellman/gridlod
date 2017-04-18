@@ -85,6 +85,30 @@ def extractPatchFine(NCoarse,
     return patchFineIndexStart + patchFineIndexMap
 
 def pIndexMap(NFrom, NTo, NStep):
+    """ Create a map of the point indices from one grid to another.
+    
+    NFrom is the grid on which the map is defined
+    NTo   is the grid onto which the map ranges
+    NStep is the the number of steps in the To-grid for each step in the From-grid
+
+    Example in 1D)
+
+    NFrom = np.array([2])
+    NTo   = np.array([10])
+    NStep = np.array([3])
+
+                 v        v        v
+      toIndex =  0  1  2  3  4  5  6  7  8  9  10
+    fromIndex =  0        1        2
+        grids    |--+--+--|--+--+--|--+--+--+--+
+
+    | denotes the nodes of NFrom (and NTo)
+    + denotes the nodes of NTo 
+
+    pIndexMap(NFrom, Nto, NStep) returns np.array([0, 3, 6]) marked by 'v' above
+
+    (NTo[-1] is always ignored, so in this 1D-example NTo can be set to anything)
+    """
     NTopBasis = linearpIndexBasis(NTo)
     NTopBasis = NStep*NTopBasis
 

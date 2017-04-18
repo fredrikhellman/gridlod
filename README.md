@@ -25,13 +25,13 @@ These packages might be needed:
 You can find some examples on how to use it in the test directory
 `test`. See e.g. `gridlod/test/test_pg.py` or
 `gridlod/integrations/test_pgtransport.py`. Especially, I think the
-example on line 89 in test_pg.py is illustrative, since that example
-is taken from Daniel Peterseim's paper, "Variational Multiscale
-Stabilization and the Exponential Decay of Correctors".
+example `test_1d()` in `test_pg.py` is illustrative. The example
+is taken from Daniel Peterseim's paper, *Variational Multiscale
+Stabilization and the Exponential Decay of Correctors*.
 
 ## Basic terminology
 The code has been developed in stages, and the terminology is not
-consistent, but some pointers come here.
+consistent. A few pointers follow.
 
 * `world` means the unit hypercube in question.
 * `patch` means a subdomain that is also a hypercube.
@@ -41,9 +41,9 @@ is a 5 times 2 time 6 element hypercube.
 
 To allow for two meshes, we talk about Coarse and Fine
 quantities. `NWorldCoarse` for example is the extent of the world in
-coarse elements, and NWorldFine the extent in fine elements. The
+coarse elements, and `NWorldFine` the extent in fine elements. The
 elementwise ratio `NWorldFine/NWorldCoarse` is consistently called
-`NCoarseElement` and should be only integers.
+`NCoarseElement` and should be all integers.
 
 All domains are hypercubes and can thus generally be described by its
 extent (typically `NPatchCoarse`) and a starting index, cartesian
@@ -73,10 +73,10 @@ The base consists of these files:
 * `femsolver.py` contains code for solving a reference FEM problem.
 * `linalg.py` contains code for solving linear systems.
 * `util.py` contains code for manipulating grid indices.
-* `lod.py` contains code for setting up the LOD patch problems.
+* `lod.py` contains code for solving the LOD patch problems.
 * `transport.py` contains code for computing fluxes.
 
 The application in *Numerical homogenization of time-dependent
 diffusion* (arXiv:1703.08857) is defined by the following files.
 * `pg.py` contains code for the main algorithm in that paper.
-* `ecworker.py` and `eccontroller.py` contains code that can parallelize computations over an ipyparallel cluster.
+* `ecworker.py` and `eccontroller.py` contains a hack that parallelizes computations over an ipyparallel cluster.
