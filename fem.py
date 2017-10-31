@@ -148,6 +148,39 @@ def assemblePatchBoundaryMatrix(NPatch, CLocGetter, aPatch=None, boundaryMap=Non
     
     return APatch
 
+def localStiffnessTensorMatrixCoefficient(N):
+    d = np.size(N)
+    detJ = np.prod(1./N)
+    ALocTensor = np.zeros([2**d, 2**d, d, d])
+    for i in range(2**d):
+        ib = np.unpackbits(np.array(i, dtype='uint8'))[:-d-1:-1].astype('bool')
+        for j in range(2**d):
+            jb = np.unpackbits(np.array(j, dtype='uint8'))[:-d-1:-1].astype('bool')
+            for k in range(d):
+                for l in range(d):
+                    noklMask = np.ones(d, dtype='bool')
+                    noklMask[k] = False
+                    noklMask[l] = False
+                    
+                    NonDifferentiatedFactorsNokl = float(1<<np.sum(~(ib[noklMask]^jb[noklMask]))) /(6.**(np.sum(noklMask)))
+                    NonDifferentiatedFactorskl = 1.0 if k == l else 1./4
+                    DifferentiatedFactors = (1-2*(ib[k]^jb[l]))
+                    ALocTensor[i, j, k, l] = detJ*N[k]*N[l]*DifferentiatedFactors*NonDifferentiatedFactorskl*NonDifferentiatedFactorsNokl
+    return ALocTensor
+
+def assemblePatchMatrixMatrixCoefficient(NPatch, ALocTensor, aPatch):
+    d = np.size(NPatch)
+    Np = np.prod(NPatch+1)
+    Nt = np.prod(NPatch)
+    
+    rows, cols = localToPatchSparsityPattern(NPatch)
+    values = np.einsum('ijkl,Tkl->Tij', ALocTensor, aPatch).flatten()
+
+    APatch = sparse.csc_matrix((values, (rows, cols)), shape=(Np, Np))
+    APatch.eliminate_zeros()
+    print values
+    return APatch
+
 def localBasis(N):
     d = np.size(N)
 

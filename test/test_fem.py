@@ -398,5 +398,19 @@ class assembleFaceConnectivityMatrix_TestCase(unittest.TestCase):
                                                     [         0,          0,      -1./2,         0, 2./2+2./3,     -1./3],
                                                     [         0,          0,          0,     -1./2,     -1./3, 2./2+2./3]])))
         
+
+class stiffnessTensorMatrixCoefficients_TestCase(unittest.TestCase):
+    def test_stiffnessMatrixForIdentityMatrix(self):
+        N = np.array([3, 4, 5], dtype='int64');
+        aPatch = np.tile(np.eye(3), [3*4*5,1,1])
+
+        ALocTensor = fem.localStiffnessTensorMatrixCoefficient(N)
+        A = fem.assemblePatchMatrixMatrixCoefficient(N, ALocTensor, aPatch)
+
+        ALoc = fem.localStiffnessMatrix(N)
+        B = fem.assemblePatchMatrix(N, ALoc)
+
+        self.assertTrue(np.allclose(A.data, B.data))
+        
 if __name__ == '__main__':
     unittest.main()
