@@ -146,7 +146,7 @@ class assemblePatchMatrix_TestCase(unittest.TestCase):
 
         NPatch = np.array([2,2])
         ALoc = np.ones((4,4))
-        aPatch = [1, 2, 3, 4]
+        aPatch = np.array([1, 2, 3, 4])
         AComputed = fem.assemblePatchMatrix(NPatch, ALoc, aPatch)
         ACorrect = np.array([[1, 1, 0, 1,  1, 0, 0, 0, 0],
                              [1, 3, 2, 1,  3, 2, 0, 0, 0],
@@ -405,7 +405,7 @@ class stiffnessTensorMatrixCoefficients_TestCase(unittest.TestCase):
         aPatch = np.tile(np.eye(3), [3*4*5,1,1])
 
         ALocTensor = fem.localStiffnessTensorMatrixCoefficient(N)
-        A = fem.assemblePatchMatrixMatrixCoefficient(N, ALocTensor, aPatch)
+        A = fem.assemblePatchMatrix(N, ALocTensor, aPatch)
 
         ALoc = fem.localStiffnessMatrix(N)
         B = fem.assemblePatchMatrix(N, ALoc)

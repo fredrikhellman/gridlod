@@ -90,7 +90,16 @@ def assemblePatchMatrix(NPatch, ALoc, aPatch=None):
         aPatch = np.ones(Nt)
 
     rows, cols = localToPatchSparsityPattern(NPatch)
-    values = np.kron(aPatch, ALoc.flatten())
+
+    assert((aPatch.ndim == 1 and ALoc.ndim == 2) or
+           (aPatch.ndim == 3 and ALoc.ndim == 4))
+    
+    if aPatch.ndim == 1:
+        # Coefficient is scalar
+        values = np.kron(aPatch, ALoc.flatten())
+    elif aPatch.ndim == 3:
+        # Coefficient is matrix-valued
+        values = np.einsum('ijkl,Tkl->Tij', ALoc, aPatch).flatten()
 
     APatch = sparse.csc_matrix((values, (rows, cols)), shape=(Np, Np))
     APatch.eliminate_zeros()
@@ -167,19 +176,6 @@ def localStiffnessTensorMatrixCoefficient(N):
                     DifferentiatedFactors = (1-2*(ib[k]^jb[l]))
                     ALocTensor[i, j, k, l] = detJ*N[k]*N[l]*DifferentiatedFactors*NonDifferentiatedFactorskl*NonDifferentiatedFactorsNokl
     return ALocTensor
-
-def assemblePatchMatrixMatrixCoefficient(NPatch, ALocTensor, aPatch):
-    d = np.size(NPatch)
-    Np = np.prod(NPatch+1)
-    Nt = np.prod(NPatch)
-    
-    rows, cols = localToPatchSparsityPattern(NPatch)
-    values = np.einsum('ijkl,Tkl->Tij', ALocTensor, aPatch).flatten()
-
-    APatch = sparse.csc_matrix((values, (rows, cols)), shape=(Np, Np))
-    APatch.eliminate_zeros()
-    print values
-    return APatch
 
 def localBasis(N):
     d = np.size(N)

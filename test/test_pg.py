@@ -524,6 +524,7 @@ class PetrovGalerkinLOD_TestCase(unittest.TestCase):
 
         self.assertTrue(np.allclose(lodFluxTF, fineFluxTF, rtol=1e-7))
 
+@unittest.skip("skipped until eccontroller/worker files available and adapated")
 class MatrixValuedPGLOD_TestCase(unittest.TestCase):
     def test_PgLodForIdentityMatrix2d(self):
         NWorldCoarse = np.array([2,2])
@@ -545,7 +546,7 @@ class MatrixValuedPGLOD_TestCase(unittest.TestCase):
         aCoef = coef.coefficientFine(NWorldCoarse, NCoarseElement, aPatch)
         
         pglodMatrix = pg.PetrovGalerkinLOD(world, k, IPatchGenerator, 0)
-        pglodMatrix.updateCorrectors(aCoef, clearFineQuantities=False, MatrixValued = True)
+        pglodMatrix.updateCorrectors(aCoef, clearFineQuantities=False)
         KMatrix = pglodMatrix.assembleMsStiffnessMatrix()
         
         # Standard one
