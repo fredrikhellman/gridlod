@@ -7,6 +7,9 @@ import util
 import fem
 import ecworker
 import eccontroller
+import ecworkerMatrixValued
+import eccontrollerMatrixValued
+
 
 class PetrovGalerkinLOD:
     def __init__(self, world, k, IPatchGenerator, epsilonTol, printLevel=0):
@@ -27,7 +30,7 @@ class PetrovGalerkinLOD:
 
         eccontroller.clearWorkers()
         
-    def updateCorrectors(self, coefficient, clearFineQuantities=True):
+    def updateCorrectors(self, coefficient, clearFineQuantities=True, MatrixValued=False):
         world = self.world
         k = self.k
         IPatchGenerator = self.IPatchGenerator
@@ -55,7 +58,10 @@ class PetrovGalerkinLOD:
 
         if self.printLevel >= 2:
             print 'Setting up workers'
-        eccontroller.setupWorker(world, coefficient, IPatchGenerator, k, clearFineQuantities, self.printLevel)
+        if MatrixValued:
+            eccontrollerMatrixValued.setupWorker(world, coefficient, IPatchGenerator, k, clearFineQuantities, self.printLevel)
+        else:
+            eccontroller.setupWorker(world, coefficient, IPatchGenerator, k, clearFineQuantities, self.printLevel)
         if self.printLevel >= 2:
             print 'Done'
             
@@ -76,11 +82,19 @@ class PetrovGalerkinLOD:
                     coefficientPatch = coefficient.localize(ecT.iPatchWorldCoarse, ecT.NPatchCoarse)
                     epsilonT = ecList[TInd].computeErrorIndicatorFineWithLagging(coefficientPatch.aFine, coefficientPatch.aLagging)
                 elif hasattr(coefficient, 'rCoarse'):
+                    # if MatrixValued:
+                    #     coefficientPatch = coefficient.localize(ecT.iPatchWorldCoarse, ecT.NPatchCoarse)
+                    #     epsilonT = ecList[TInd].computeErrorIndicatorMatrixValued(coefficientPatch.rCoarse)
+                    # else:
                     coefficientPatch = coefficient.localize(ecT.iPatchWorldCoarse, ecT.NPatchCoarse)
                     epsilonT = ecList[TInd].computeErrorIndicator(coefficientPatch.rCoarse)
                 elif hasattr(ecT, 'fsi'):
-                    coefficientPatch = coefficient.localize(ecT.iPatchWorldCoarse, ecT.NPatchCoarse)
-                    epsilonT = ecList[TInd].computeErrorIndicatorFine(coefficientPatch)
+                    if MatrixValued:
+                        coefficientPatch = coefficient.localize(ecT.iPatchWorldCoarse, ecT.NPatchCoarse)
+                        epsilonT = ecList[TInd].computeErrorIndicatorFineMatrixValued(coefficientPatch)
+                    else:
+                        coefficientPatch = coefficient.localize(ecT.iPatchWorldCoarse, ecT.NPatchCoarse)
+                        epsilonT = ecList[TInd].computeErrorIndicatorFine(coefficientPatch)
                 else:
                     coefficientPatch = None
                     epsilonT = np.inf
@@ -107,7 +121,10 @@ class PetrovGalerkinLOD:
         if self.printLevel >= 2:
             print 'Waiting for results', len(ecComputeList)
 
-        ecResultList = eccontroller.mapComputations(ecComputeList, self.printLevel)
+        if MatrixValued:
+            ecResultList = eccontrollerMatrixValued.mapComputations(ecComputeList, self.printLevel)
+        else:
+            ecResultList = eccontroller.mapComputations(ecComputeList, self.printLevel)
         for ecResult, ecCompute in zip(ecResultList, ecComputeList):
             ecList[ecCompute[0]] = ecResult
 
@@ -377,5 +394,4 @@ class PetrovGalerkinLOD:
         uFull = np.zeros(NpCoarse)
         uFull[free] = uFree
 
-        return uFull, uFree, modifiedBasis
-    
+        return uFull, uFree, modifiedBasis    
