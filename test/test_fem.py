@@ -411,6 +411,61 @@ class stiffnessTensorMatrixCoefficients_TestCase(unittest.TestCase):
         B = fem.assemblePatchMatrix(N, ALoc)
 
         self.assertTrue(np.allclose(A.data, B.data))
+
+    def test_stiffnessMatrixForConstantFullA(self):
+        N = np.array([3, 4, 5], dtype='int64');
+        AConstant = np.array([[3.0, 0.2, 0.1],
+                              [0.2, 2.0, 0.3],
+                              [0.1, 0.3, 1.0]])
+        aPatch = np.tile(AConstant, [3*4*5,1,1])
+
+        ALocTensor = fem.localStiffnessTensorMatrixCoefficient(N)
+        A = fem.assemblePatchMatrix(N, ALocTensor, aPatch)
+
+        # Create the functions x1, x2 and x3
+        pc = util.pCoordinates(N)
+        x1 = pc[:,0]
+        x2 = pc[:,1]
+        x3 = pc[:,2]
+
+        # Check diagonal elements
+        self.assertTrue(np.isclose(np.dot(x1, A*x1), 3.0))
+        self.assertTrue(np.isclose(np.dot(x2, A*x2), 2.0))
+        self.assertTrue(np.isclose(np.dot(x3, A*x3), 1.0))
+
+        # Check off-diagonal elements
+        self.assertTrue(np.isclose(np.dot(x1, A*x2), 0.2))
+        self.assertTrue(np.isclose(np.dot(x2, A*x1), 0.2))
+        self.assertTrue(np.isclose(np.dot(x1, A*x3), 0.1))
+        self.assertTrue(np.isclose(np.dot(x3, A*x1), 0.1))
+        self.assertTrue(np.isclose(np.dot(x2, A*x3), 0.3))
+        self.assertTrue(np.isclose(np.dot(x3, A*x2), 0.3))
+
+        
+    def test_stiffnessMatrixForVaryingDiagonalA(self):
+        N = np.array([3, 4, 5], dtype='int64');
+        AConstant1 = np.array([[1.0, 0, 0],
+                               [0, 2.0, 0],
+                               [0, 0, 1.0]])
+        AConstant2 = np.array([[1.0, 0, 0],
+                               [0, 7.0, 0],
+                               [0, 0, 1.0]])
+        aPatchCube = np.tile(AConstant1, [3,4,5,1,1])
+        aPatchCube[:,:2,:,:,:] = AConstant2
+        aPatch = np.reshape(aPatchCube, [3*4*5,3,3])
+
+        ALocTensor = fem.localStiffnessTensorMatrixCoefficient(N)
+        A = fem.assemblePatchMatrix(N, ALocTensor, aPatch)
+
+        # Create the functions x1, x2 and x3
+        pc = util.pCoordinates(N)
+        x1 = pc[:,0]
+        x2 = pc[:,1]
+        x3 = pc[:,2]
+
+        self.assertTrue(np.isclose(np.dot(x1, A*x1), 1.0))
+        self.assertTrue(np.isclose(np.dot(x2, A*x2), 0.5*(2.+7.)))
+        self.assertTrue(np.isclose(np.dot(x3, A*x3), 1.0))
         
 if __name__ == '__main__':
     unittest.main()
