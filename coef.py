@@ -23,7 +23,7 @@ class coefficientFine(coefficientAbstract):
         self.NPatchCoarse = np.array(NPatchCoarse)
         self.NCoarseElement = NCoarseElement
         self._aFine = aFine
-        assert(np.size(aFine) == np.prod(NPatchCoarse*NCoarseElement))
+        #assert(np.size(aFine) == np.prod(NPatchCoarse*NCoarseElement))
 
     def localize(self, iSubPatchCoarse, NSubPatchCoarse):
         NPatchCoarse = self.NPatchCoarse
