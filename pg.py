@@ -7,8 +7,8 @@ import util
 import fem
 import ecworker
 import eccontroller
-import ecworkerMatrixValued
-import eccontrollerMatrixValued
+#import ecworkerMatrixValued
+#import eccontrollerMatrixValued
 
 
 class PetrovGalerkinLOD:
@@ -30,7 +30,7 @@ class PetrovGalerkinLOD:
 
         eccontroller.clearWorkers()
         
-    def updateCorrectors(self, coefficient, clearFineQuantities=True, MatrixValued=False):
+    def updateCorrectors(self, coefficient, clearFineQuantities=True):
         world = self.world
         k = self.k
         IPatchGenerator = self.IPatchGenerator
@@ -40,6 +40,9 @@ class PetrovGalerkinLOD:
 
         saddleSolver = lod.schurComplementSolver(world.NWorldCoarse*world.NCoarseElement)
 
+        assert(coefficient.aFine.ndim == 1 or coefficient.aFine.ndim == 3)
+        MatrixValued = coefficient.aFine.ndim == 3
+        
         self.coefficient = deepcopy(coefficient)
         
         # Reset all caches
@@ -59,7 +62,8 @@ class PetrovGalerkinLOD:
         if self.printLevel >= 2:
             print 'Setting up workers'
         if MatrixValued:
-            eccontrollerMatrixValued.setupWorker(world, coefficient, IPatchGenerator, k, clearFineQuantities, self.printLevel)
+            pass
+            #eccontrollerMatrixValued.setupWorker(world, coefficient, IPatchGenerator, k, clearFineQuantities, self.printLevel)
         else:
             eccontroller.setupWorker(world, coefficient, IPatchGenerator, k, clearFineQuantities, self.printLevel)
         if self.printLevel >= 2:
@@ -89,12 +93,8 @@ class PetrovGalerkinLOD:
                     coefficientPatch = coefficient.localize(ecT.iPatchWorldCoarse, ecT.NPatchCoarse)
                     epsilonT = ecList[TInd].computeErrorIndicator(coefficientPatch.rCoarse)
                 elif hasattr(ecT, 'fsi'):
-                    if MatrixValued:
-                        coefficientPatch = coefficient.localize(ecT.iPatchWorldCoarse, ecT.NPatchCoarse)
-                        epsilonT = ecList[TInd].computeErrorIndicatorFineMatrixValued(coefficientPatch)
-                    else:
-                        coefficientPatch = coefficient.localize(ecT.iPatchWorldCoarse, ecT.NPatchCoarse)
-                        epsilonT = ecList[TInd].computeErrorIndicatorFine(coefficientPatch)
+                    coefficientPatch = coefficient.localize(ecT.iPatchWorldCoarse, ecT.NPatchCoarse)
+                    epsilonT = ecList[TInd].computeErrorIndicatorFine(coefficientPatch)
                 else:
                     coefficientPatch = None
                     epsilonT = np.inf
@@ -122,7 +122,8 @@ class PetrovGalerkinLOD:
             print 'Waiting for results', len(ecComputeList)
 
         if MatrixValued:
-            ecResultList = eccontrollerMatrixValued.mapComputations(ecComputeList, self.printLevel)
+            pass
+            #ecResultList = eccontrollerMatrixValued.mapComputations(ecComputeList, self.printLevel)
         else:
             ecResultList = eccontroller.mapComputations(ecComputeList, self.printLevel)
         for ecResult, ecCompute in zip(ecResultList, ecComputeList):
@@ -190,7 +191,7 @@ class PetrovGalerkinLOD:
 
     def computeFaceFluxTF(self, u, f=None):
         assert(f is None)
-        
+            
         world = self.world
         NWorldCoarse = world.NWorldCoarse
         d = np.size(NWorldCoarse)

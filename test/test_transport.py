@@ -356,7 +356,7 @@ class computeHarmonicMeanFaceFlux_TestCase(unittest.TestCase):
         
         fluxTF = transport.computeHarmonicMeanFaceFlux(NPatchCoarse, NPatchCoarse, NCoarseElement, aPatch, uPatch)
         self.assertTrue(np.all(fluxTF.shape == (24, 4)))
-        self.assertTrue(np.all(fluxTF == 0))
+        self.assertTrue(np.allclose(fluxTF, 0))
 
         x = util.pCoordinates(NPatchFine)[:,0]
         y = util.pCoordinates(NPatchFine)[:,1]
