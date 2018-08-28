@@ -55,6 +55,7 @@ class PetrovGalerkinLOD:
 
         if self.printLevel >= 2:
             print 'Setting up workers'
+
         eccontroller.setupWorker(world, coefficient, IPatchGenerator, k, clearFineQuantities, self.printLevel)
         if self.printLevel >= 2:
             print 'Done'
@@ -173,7 +174,7 @@ class PetrovGalerkinLOD:
 
     def computeFaceFluxTF(self, u, f=None):
         assert(f is None)
-        
+            
         world = self.world
         NWorldCoarse = world.NWorldCoarse
         d = np.size(NWorldCoarse)
@@ -377,5 +378,4 @@ class PetrovGalerkinLOD:
         uFull = np.zeros(NpCoarse)
         uFull[free] = uFree
 
-        return uFull, uFree, modifiedBasis
-    
+        return uFull, uFree, modifiedBasis    

@@ -135,6 +135,8 @@ class CoarseScaleInformation:
         self.correctorFluxTF = correctorFluxTF
         self.basisFluxTF = basisFluxTF
 
+
+        
 class elementCorrector:
     def __init__(self, world, k, iElementWorldCoarse, saddleSolver=None):
         self.k = k
@@ -195,9 +197,14 @@ class elementCorrector:
 
         aPatch = coefficientPatch.aFine
 
-        assert(np.size(aPatch) == NtFine)
-
-        ALocFine = world.ALocFine
+        assert(aPatch.shape[0] == NtFine)
+        assert(aPatch.ndim == 1 or aPatch.ndim == 3)
+        
+        if aPatch.ndim == 1:
+            ALocFine = world.ALocFine
+        elif aPatch.ndim == 3:
+            ALocFine = world.ALocMatrixFine
+            
         MLocFine = world.MLocFine
 
         iElementPatchCoarse = self.iElementPatchCoarse
@@ -281,7 +288,13 @@ class elementCorrector:
         correctorsList = self.fsi.correctorsList
         aPatch = self.fsi.coefficient.aFine
 
-        ALocFine = world.ALocFine
+        assert(aPatch.ndim == 1 or aPatch.ndim == 3)
+        
+        if aPatch.ndim == 1:
+            ALocFine = world.ALocFine
+        elif aPatch.ndim == 3:
+            ALocFine = world.ALocMatrixFine
+
         localBasis = world.localBasis
 
         TPrimeCoarsepStartIndices = util.lowerLeftpIndexMap(NPatchCoarse-1, NPatchCoarse)
@@ -334,20 +347,26 @@ class elementCorrector:
             eigenvalues = scipy.linalg.eigvals(LTPrimeij[TPrimeInd][:-1,:-1], Kij[:-1,:-1])
             muTPrime[TPrimeInd] = np.max(np.real(eigenvalues))
 
-        # Compute coarse element face flux for basis and Q (not yet implemented for R)
-        correctorFluxTF = transport.computeHarmonicMeanFaceFlux(world.NWorldCoarse,
-                                                                NPatchCoarse,
-                                                                NCoarseElement, aPatch, QPatch)
+        if aPatch.ndim == 1:
+            # Face flux computations are only possible for scalar coefficients
+            # Compute coarse element face flux for basis and Q (not yet implemented for R)
+            correctorFluxTF = transport.computeHarmonicMeanFaceFlux(world.NWorldCoarse,
+                                                                    NPatchCoarse,
+                                                                    NCoarseElement, aPatch, QPatch)
 
-        # Need to compute over at least one fine element over the
-        # boundary of the main element to make the harmonic average
-        # right.  Note: We don't do this for correctorFluxTF, beause
-        # we do not have access to a outside the patch...
-        localBasisExtended = np.zeros_like(QPatch)
-        localBasisExtended[TPrimeFinepStartIndices[TInd] + TPrimeFinepIndexMap,:] = localBasis
-        basisFluxTF = transport.computeHarmonicMeanFaceFlux(world.NWorldCoarse,
-                                                            NPatchCoarse,
-                                                            NCoarseElement, aPatch, localBasisExtended)[:,TInd,:]
+            # Need to compute over at least one fine element over the
+            # boundary of the main element to make the harmonic average
+            # right.  Note: We don't do this for correctorFluxTF, beause
+            # we do not have access to a outside the patch...
+            localBasisExtended = np.zeros_like(QPatch)
+            localBasisExtended[TPrimeFinepStartIndices[TInd] + TPrimeFinepIndexMap,:] = localBasis
+            basisFluxTF = transport.computeHarmonicMeanFaceFlux(world.NWorldCoarse,
+                                                                NPatchCoarse,
+                                                                NCoarseElement, aPatch, localBasisExtended)[:,TInd,:]
+        else:
+            # For non-scalar A we cannot compute these flux-quantities (yet)
+            basisFluxTF = None
+            correctorFluxTF = None
 
         if isinstance(self.fsi.coefficient, coef.coefficientCoarseFactorAbstract):
             rCoarse = self.fsi.coefficient.rCoarse
@@ -362,6 +381,8 @@ class elementCorrector:
     def computeErrorIndicatorFineWithLagging(self, a, aTilde):
         assert(hasattr(self, 'csi'))
 
+        assert(a.ndim == 1) # Matrix-valued A not supported in thus function yet
+        
         world = self.world
         NPatchCoarse = self.NPatchCoarse
         NCoarseElement = world.NCoarseElement
@@ -414,18 +435,30 @@ class elementCorrector:
         world = self.world
         NCoarseElement = world.NCoarseElement
         NPatchFine = NPatchCoarse*NCoarseElement
+        
+        a = coefficientNew.aFine
 
-        ALocFine = world.ALocFine
+        assert(a.ndim == 1 or a.ndim == 3)
+        
+        if a.ndim == 1:
+            ALocFine = world.ALocFine
+        else:
+            ALocFine = world.ALocMatrixFine
         P = world.localBasis
 
-        a = coefficientNew.aFine
         aTilde = self.fsi.coefficient.aFine
 
         TFinetIndexMap = util.lowerLeftpIndexMap(NCoarseElement-1, NPatchFine-1)
         iElementPatchFine = self.iElementPatchCoarse*NCoarseElement
         TFinetStartIndex = util.convertpCoordinateToIndex(NPatchFine-1, iElementPatchFine)
 
-        b = ((aTilde - a)**2)/a
+        # Compute A^-1 (A_T - A)**2. This has to be done in a batch. inv works batchwise
+        if a.ndim == 1:
+            b = 1./a*(aTilde-a)**2
+        else:
+            aInv = np.linalg.inv(a)
+            b = np.einsum('Tij, Tjl, Tlk -> Tik', aInv, aTilde - a, aTilde - a)
+        
         bT = b[TFinetStartIndex + TFinetIndexMap]
         PatchNorm = fem.assemblePatchMatrix(NPatchFine, ALocFine, b)
         TNorm = fem.assemblePatchMatrix(NCoarseElement, ALocFine, bT)

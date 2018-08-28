@@ -22,7 +22,7 @@ def solveFine(world, aFine, MbFine, AbFine, boundaryConditions):
     freeFine  = np.setdiff1d(np.arange(NpFine), fixedFine)
     AFine = fem.assemblePatchMatrix(NWorldFine, world.ALocFine, aFine)
     MFine = fem.assemblePatchMatrix(NWorldFine, world.MLocFine)
-
+    
     bFine = MFine*MbFine + AFine*AbFine
     
     AFineFree = AFine[freeFine][:,freeFine]

@@ -523,7 +523,84 @@ class PetrovGalerkinLOD_TestCase(unittest.TestCase):
         fineFluxTF = transport.computeHarmonicMeanFaceFlux(NWorldCoarse, NWorldCoarse, NCoarseElement, aBase, uFineFull)
 
         self.assertTrue(np.allclose(lodFluxTF, fineFluxTF, rtol=1e-7))
+
+class MatrixValuedPGLOD_TestCase(unittest.TestCase):
+    def test_PGLODForIdentityMatrixCoefficient2D(self):
+        NWorldCoarse = np.array([2,2])
+        NCoarseElement = np.array([2,2])
         
+        NFine = NWorldCoarse*NCoarseElement
+        NtFine = np.prod(NFine)
+        NpCoarse = np.prod(NWorldCoarse+1)
+        NpFine = np.prod(NWorldCoarse*NCoarseElement+1)
+        
+        world = World(NWorldCoarse, NCoarseElement)
+
+        IPatchGenerator = lambda i, N: interp.L2ProjectionPatchMatrix(i, N, NWorldCoarse, NCoarseElement)
+        
+        k = np.inf
+        
+        # Matrix Valued with Identity
+        aPatch = np.tile(np.eye(2), [2*2*4,1,1])
+        aCoef = coef.coefficientFine(NWorldCoarse, NCoarseElement, aPatch)
+        
+        pglodMatrix = pg.PetrovGalerkinLOD(world, k, IPatchGenerator, 0)
+        pglodMatrix.updateCorrectors(aCoef, clearFineQuantities=False)
+        KMatrix = pglodMatrix.assembleMsStiffnessMatrix()
+        
+        # Standard one
+        aBase = np.ones(NtFine)
+        
+        pglod = pg.PetrovGalerkinLOD(world, k, IPatchGenerator, 0)
+        pglod.updateCorrectors(coef.coefficientFine(NWorldCoarse, NCoarseElement, aBase), clearFineQuantities=False)
+        K = pglod.assembleMsStiffnessMatrix()
+        
+        self.assertTrue(np.allclose(K.data, KMatrix.data))        
+
+    def test_PGLODForDiagonalMatrixCoefficient2D(self):
+        NWorldCoarse = np.array([2,2])
+        NCoarseElement = np.array([2,2])
+        
+        NFine = NWorldCoarse*NCoarseElement
+        NtFine = np.prod(NFine)
+        NpCoarse = np.prod(NWorldCoarse+1)
+        NpFine = np.prod(NWorldCoarse*NCoarseElement+1)
+        
+        world = World(NWorldCoarse, NCoarseElement)
+
+        IPatchGenerator = lambda i, N: interp.L2ProjectionPatchMatrix(i, N, NWorldCoarse, NCoarseElement)
+        
+        k = np.inf
+        
+        def createKMatrix(aPatch):
+            aCoef = coef.coefficientFine(NWorldCoarse, NCoarseElement, aPatch)
+        
+            pglodMatrix = pg.PetrovGalerkinLOD(world, k, IPatchGenerator, 0)
+            pglodMatrix.updateCorrectors(aCoef, clearFineQuantities=False)
+            return pglodMatrix.assembleMsStiffnessMatrix()
+
+        # Matrix Valued with diag(1, 3)
+        aPatch13 = np.tile(np.array([[1, 0],
+                                     [0, 3]]), [2*2*4,1,1])
+        # Matrix Valued with diag(3, 1)
+        aPatch31 = np.tile(np.array([[3, 0],
+                                     [0, 1]]), [2*2*4,1,1])
+        KMatrix13 = createKMatrix(aPatch13)
+        KMatrix31 = createKMatrix(aPatch31)
+
+        # Create the functions sin(x1) and sin(x2)
+        pc = util.pCoordinates(NWorldCoarse)
+        sinx1 = np.sin(pc[:,0])
+        sinx2 = np.sin(pc[:,1])
+
+        # Switching between 13 and 31 is like switching x_1 and x_2
+        self.assertTrue(np.allclose(np.dot(sinx1, KMatrix13*sinx1), np.dot(sinx2, KMatrix31*sinx2)))
+        self.assertTrue(np.allclose(np.dot(sinx2, KMatrix13*sinx2), np.dot(sinx1, KMatrix31*sinx1)))
+
+        # Test that we do not have trivial equalities by mistake
+        self.assertTrue(not np.allclose(np.dot(sinx1, KMatrix13*sinx1), np.dot(sinx1, KMatrix31*sinx1)))
+        self.assertTrue(not np.allclose(np.dot(sinx2, KMatrix13*sinx2), np.dot(sinx2, KMatrix31*sinx2)))
+    
 if __name__ == '__main__':
     #import cProfile
     #command = """unittest.main()"""
