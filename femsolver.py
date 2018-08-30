@@ -52,8 +52,13 @@ def solveCoarse(world, aFine, MbFine, AbFine, boundaryConditions):
     boundaryMap = boundaryConditions==0
     fixedCoarse = util.boundarypIndexMap(NWorldCoarse, boundaryMap=boundaryMap)
     freeCoarse  = np.setdiff1d(np.arange(NpCoarse), fixedCoarse)
-    
-    AFine = fem.assemblePatchMatrix(NWorldFine, world.ALocFine, aFine)
+
+    if aFine.ndim == 1:
+        ALocFine = world.ALocFine
+    else:
+        ALocFine = world.ALocMatrixFine
+
+    AFine = fem.assemblePatchMatrix(NWorldFine, ALocFine, aFine)
     MFine = fem.assemblePatchMatrix(NWorldFine, world.MLocFine)
 
     bFine = MFine*MbFine + AFine*AbFine
