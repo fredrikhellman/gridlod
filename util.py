@@ -32,7 +32,7 @@ def convertpIndexToCoordinate(N, ind):
 
 def convertpCoordinateToIndex(N, coord):
     basis = linearpIndexBasis(N)
-    return np.dot(basis, coord)
+    return np.dot(coord, basis)
 
 def interiorpIndexMap(N):
     """Compute indices (linear order) of all interior points."""
