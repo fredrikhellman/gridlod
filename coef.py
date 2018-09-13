@@ -34,7 +34,7 @@ class coefficientFine(coefficientAbstract):
 
         # a
         coarsetIndexMap = util.lowerLeftpIndexMap(NSubPatchFine-1, NPatchFine-1)
-        coarsetStartIndex = util.convertpCoordinateToIndex(NPatchFine-1, iSubPatchFine)
+        coarsetStartIndex = util.convertpCoordIndexToLinearIndex(NPatchFine-1, iSubPatchFine)
         aFineLocalized = self._aFine[coarsetStartIndex + coarsetIndexMap]
 
         localizedCoefficient = coefficientFine(NSubPatchCoarse, NCoarseElement, aFineLocalized)
@@ -61,7 +61,7 @@ class coefficientFineWithLagging(coefficientWithLaggingAbstract):
 
         # a
         coarsetIndexMap = util.lowerLeftpIndexMap(NSubPatchFine-1, NPatchFine-1)
-        coarsetStartIndex = util.convertpCoordinateToIndex(NPatchFine-1, iSubPatchFine)
+        coarsetStartIndex = util.convertpCoordIndexToLinearIndex(NPatchFine-1, iSubPatchFine)
         aFineLocalized = self._aFine[coarsetStartIndex + coarsetIndexMap]
         aLaggingLocalized = self._aLagging[coarsetStartIndex + coarsetIndexMap]
 
@@ -115,12 +115,12 @@ class coefficientCoarseFactor(coefficientAbstract, coefficientCoarseFactorAbstra
 
         # rCoarse
         coarseTIndexMap = util.lowerLeftpIndexMap(NSubPatchCoarse-1, NPatchCoarse-1)
-        coarseTStartIndex = util.convertpCoordinateToIndex(NPatchCoarse-1, iSubPatchCoarse)
+        coarseTStartIndex = util.convertpCoordIndexToLinearIndex(NPatchCoarse-1, iSubPatchCoarse)
         rCoarseLocalized = self._rCoarse[coarseTStartIndex + coarseTIndexMap]
 
         # a
         coarsetIndexMap = util.lowerLeftpIndexMap(NSubPatchFine-1, NPatchFine-1)
-        coarsetStartIndex = util.convertpCoordinateToIndex(NPatchFine-1, iSubPatchFine)
+        coarsetStartIndex = util.convertpCoordIndexToLinearIndex(NPatchFine-1, iSubPatchFine)
         aLocalized = a[coarsetStartIndex + coarsetIndexMap]
 
         localizedCoefficient = coefficientCoarseFactor(NSubPatchCoarse, NCoarseElement, None, rCoarseLocalized)

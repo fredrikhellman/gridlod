@@ -70,7 +70,7 @@ class PetrovGalerkinLOD:
                 print str(TInd) + ' / ' + str(NtCoarse),
 
             ageList[TInd] += 1
-            iElement = util.convertpIndexToCoordinate(world.NWorldCoarse-1, TInd)
+            iElement = util.convertpLinearIndexToCoordIndex(world.NWorldCoarse-1, TInd)
             if ecList[TInd] is not None:
                 ecT = ecList[TInd]
                 if hasattr(coefficient, 'aLagging'):
@@ -166,7 +166,7 @@ class PetrovGalerkinLOD:
             NPatchFine = ecT.NPatchCoarse*NCoarseElement
             iPatchWorldFine = ecT.iPatchWorldCoarse*NCoarseElement
             patchpIndexMap = util.lowerLeftpIndexMap(NPatchFine, NWorldFine)
-            patchpStartIndex = util.convertpCoordinateToIndex(NWorldFine, iPatchWorldFine)
+            patchpStartIndex = util.convertpCoordIndexToLinearIndex(NWorldFine, iPatchWorldFine)
 
             uFine[patchpStartIndex + patchpIndexMap] += correctorT
 
@@ -190,7 +190,7 @@ class PetrovGalerkinLOD:
             ecT = self.ecList[TInd]
             assert(hasattr(ecT, 'csi'))
 
-            patchtStartIndex = util.convertpCoordinateToIndex(NWorldCoarse-1, ecT.iPatchWorldCoarse)
+            patchtStartIndex = util.convertpCoordIndexToLinearIndex(NWorldCoarse-1, ecT.iPatchWorldCoarse)
             patchtIndexMap = util.lowerLeftpIndexMap(ecT.NPatchCoarse-1, NWorldCoarse-1)
             elementpIndex = elementpStartIndices[TInd] + elementpIndexMap
 
@@ -231,7 +231,7 @@ class PetrovGalerkinLOD:
             iPatchWorldFine = ecT.iPatchWorldCoarse*NCoarseElement
             
             patchpIndexMap = util.lowerLeftpIndexMap(NPatchFine, NWorldFine)
-            patchpStartIndex = util.convertpCoordinateToIndex(NWorldFine, iPatchWorldFine)
+            patchpStartIndex = util.convertpCoordIndexToLinearIndex(NWorldFine, iPatchWorldFine)
             
             colsT = TpStartIndices[TInd] + TpIndexMap
             rowsT = patchpStartIndex + patchpIndexMap
@@ -272,7 +272,7 @@ class PetrovGalerkinLOD:
             NPatchCoarse = ecT.NPatchCoarse
 
             patchpIndexMap = util.lowerLeftpIndexMap(NPatchCoarse, NWorldCoarse)
-            patchpStartIndex = util.convertpCoordinateToIndex(NWorldCoarse, ecT.iPatchWorldCoarse)
+            patchpStartIndex = util.convertpCoordIndexToLinearIndex(NWorldCoarse, ecT.iPatchWorldCoarse)
             
             colsT = TpStartIndices[TInd] + TpIndexMap
             rowsT = patchpStartIndex + patchpIndexMap

@@ -15,7 +15,7 @@ def linearpIndexBasis(N):
     b = np.hstack([[1], cp[:-1]])
     return b
 
-def convertpIndexToCoordinate(N, ind):
+def convertpLinearIndexToCoordIndex(N, ind):
     ind = np.array(ind)
     d = np.size(N)
     if ind.ndim > 0:
@@ -30,7 +30,7 @@ def convertpIndexToCoordinate(N, ind):
     assert(np.all(ind == 0))
     return coord
 
-def convertpCoordinateToIndex(N, coord):
+def convertpCoordIndexToLinearIndex(N, coord):
     basis = linearpIndexBasis(N)
     return np.dot(coord, basis)
 

@@ -306,7 +306,7 @@ class elementCorrector:
         TPrimeFinepStartIndices = util.pIndexMap(NPatchCoarse-1, NPatchFine, NCoarseElement)
         TPrimeFinepIndexMap = util.lowerLeftpIndexMap(NCoarseElement, NPatchFine)
 
-        TInd = util.convertpCoordinateToIndex(NPatchCoarse-1, self.iElementPatchCoarse)
+        TInd = util.convertpCoordIndexToLinearIndex(NPatchCoarse-1, self.iElementPatchCoarse)
 
         QPatch = np.column_stack(correctorsList)
         
@@ -389,7 +389,7 @@ class elementCorrector:
         NPatchFine = NPatchCoarse*NCoarseElement
         iElementPatchCoarse = self.iElementPatchCoarse
 
-        elementCoarseIndex = util.convertpCoordinateToIndex(NPatchCoarse-1, iElementPatchCoarse)
+        elementCoarseIndex = util.convertpCoordIndexToLinearIndex(NPatchCoarse-1, iElementPatchCoarse)
         
         TPrimeFinetStartIndices = util.pIndexMap(NPatchCoarse-1, NPatchFine-1, NCoarseElement)
         TPrimeFinetIndexMap = util.lowerLeftpIndexMap(NCoarseElement-1, NPatchFine-1)
@@ -417,7 +417,7 @@ class elementCorrector:
         NCoarseElement = world.NCoarseElement
         iElementPatchCoarse = self.iElementPatchCoarse
 
-        elementCoarseIndex = util.convertpCoordinateToIndex(NPatchCoarse-1, iElementPatchCoarse)
+        elementCoarseIndex = util.convertpCoordIndexToLinearIndex(NPatchCoarse-1, iElementPatchCoarse)
         
         rCoarse = self.csi.rCoarse
         muTPrime = self.csi.muTPrime
@@ -450,7 +450,7 @@ class elementCorrector:
 
         TFinetIndexMap = util.lowerLeftpIndexMap(NCoarseElement-1, NPatchFine-1)
         iElementPatchFine = self.iElementPatchCoarse*NCoarseElement
-        TFinetStartIndex = util.convertpCoordinateToIndex(NPatchFine-1, iElementPatchFine)
+        TFinetStartIndex = util.convertpCoordIndexToLinearIndex(NPatchFine-1, iElementPatchFine)
 
         # Compute A^-1 (A_T - A)**2. This has to be done in a batch. inv works batchwise
         if a.ndim == 1:
@@ -466,7 +466,7 @@ class elementCorrector:
         BNorm = fem.assemblePatchMatrix(NCoarseElement, ALocFine, a[TFinetStartIndex + TFinetIndexMap])
 
         TFinepIndexMap = util.lowerLeftpIndexMap(NCoarseElement, NPatchFine)
-        TFinepStartIndex = util.convertpCoordinateToIndex(NPatchFine, iElementPatchFine)
+        TFinepStartIndex = util.convertpCoordIndexToLinearIndex(NPatchFine, iElementPatchFine)
 
         Q = np.column_stack(self.fsi.correctorsList)
         QT = Q[TFinepStartIndex + TFinepIndexMap,:]

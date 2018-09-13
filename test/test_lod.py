@@ -187,7 +187,7 @@ class corrector_TestCase(unittest.TestCase):
 
         # I had difficulties come up with test cases here. This test
         # verifies that most "energy" is in the element T.
-        elementTIndex = util.convertpCoordinateToIndex(ec.NPatchCoarse-1, ec.iElementPatchCoarse)
+        elementTIndex = util.convertpCoordIndexToLinearIndex(ec.NPatchCoarse-1, ec.iElementPatchCoarse)
         self.assertTrue(np.all(ec.csi.muTPrime[elementTIndex] >= ec.csi.muTPrime))
         self.assertTrue(not np.all(ec.csi.muTPrime[elementTIndex+1] >= ec.csi.muTPrime))
         ec.clearFineQuantities()
@@ -293,7 +293,7 @@ class corrector_TestCase(unittest.TestCase):
 
         # If rCoarseSecond is different in the element itself, the error
         # indicator should be large
-        elementCoarseIndex = util.convertpCoordinateToIndex(NWorldCoarse-1, iElementWorldCoarse)
+        elementCoarseIndex = util.convertpCoordIndexToLinearIndex(NWorldCoarse-1, iElementWorldCoarse)
         rCoarseSecond = np.array(rCoarseFirst)
         rCoarseSecond[elementCoarseIndex] *= 2
         saveForNextTest = ec.computeErrorIndicator(rCoarseSecond)

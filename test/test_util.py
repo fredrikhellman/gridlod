@@ -4,23 +4,23 @@ import numpy as np
 from gridlod import util
 
 class convert_TestCase(unittest.TestCase):
-    def test_convertpCoordinateToIndex(self):
+    def test_convertpCoordIndexToLinearIndex(self):
         N = np.array([100])
         coord = np.array([44])
-        self.assertTrue(util.convertpCoordinateToIndex(N, coord) == 44)
+        self.assertTrue(util.convertpCoordIndexToLinearIndex(N, coord) == 44)
 
         N = np.array([100, 200])
         coord = np.array([44, 55])
-        self.assertTrue(util.convertpCoordinateToIndex(N, coord) == 44+55*101)
+        self.assertTrue(util.convertpCoordIndexToLinearIndex(N, coord) == 44+55*101)
 
-    def test_convertpIndexToCoordinate(self):
+    def test_convertpLinearIndexToCoordIndex(self):
         N = np.array([100])
         ind = np.array([44])
-        self.assertTrue(np.all(util.convertpIndexToCoordinate(N, ind) == [44]))
+        self.assertTrue(np.all(util.convertpLinearIndexToCoordIndex(N, ind) == [44]))
 
         N = np.array([100, 200])
         ind = 44+55*101
-        self.assertTrue(np.all(util.convertpIndexToCoordinate(N, ind) == [44, 55]))
+        self.assertTrue(np.all(util.convertpLinearIndexToCoordIndex(N, ind) == [44, 55]))
         
 class pIndexMap_TestCase(unittest.TestCase):
     def test_trivials1d(self):
@@ -158,7 +158,7 @@ class coordinate_TestCase(unittest.TestCase):
 
         NWorld = np.array([9, 9, 9, 9])
         xp = util.pCoordinates(NWorld)
-        ind = util.convertpCoordinateToIndex(NWorld, [7, 3, 6, 0])
+        ind = util.convertpCoordIndexToLinearIndex(NWorld, [7, 3, 6, 0])
         self.assertTrue(np.allclose(xp[ind] - np.array([7., 3., 6., 0.])/9., 0))
         
     def test_tCoordinates(self):
@@ -168,7 +168,7 @@ class coordinate_TestCase(unittest.TestCase):
 
         NWorld = np.array([9, 9, 9, 9])
         xt = util.tCoordinates(NWorld)
-        ind = util.convertpCoordinateToIndex(NWorld-1, [7, 3, 6, 0])
+        ind = util.convertpCoordIndexToLinearIndex(NWorld-1, [7, 3, 6, 0])
         self.assertTrue(np.allclose(xt[ind] - np.array([15., 7., 13., 1.])/18., 0))
         
 if __name__ == '__main__':
