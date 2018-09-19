@@ -63,8 +63,6 @@ def evaluateCQ1(N, cq1, coordinates):
         # 1-x_k for each dimension k, depending on the node. The
         # bitmap tells us which.
 
-        print localNodeBitmap.shape
-        print coordIndicesFpart.shape
         interpolationWeights[:, localNode] = np.prod(
             (1.0 - localNodeBitmap) + (2.0*localNodeBitmap - 1.0)*coordIndicesFpart,
             axis=1)
