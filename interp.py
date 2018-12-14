@@ -1,8 +1,9 @@
 import numpy as np
 import scipy.sparse as sparse
 
-import util
-import fem
+from . import util
+from . import fem
+from functools import reduce
 
 def nodalCoarseElementMatrix(NCoarseElement):
     NpFine = np.prod(NCoarseElement+1)
@@ -107,7 +108,7 @@ def assemblePatchInterpolationMatrix(IElement, NPatchFine, NCoarseElement):
 
     d = np.size(NPatchFine)
     
-    NPatchCoarse = NPatchFine/NCoarseElement
+    NPatchCoarse = NPatchFine//NCoarseElement
 
     NpFine = np.prod(NPatchFine+1)
     NpCoarse = np.prod(NPatchCoarse+1)

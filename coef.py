@@ -1,21 +1,21 @@
 import numpy as np
 
-import util
+from . import util
 
 class coefficientAbstract:
     @property
     def aFine(self):
-        raise(NotImplementedError('Abstract class'))
+        raise NotImplementedError
 
 class coefficientCoarseFactorAbstract:
     @property
     def rCoarse(self):
-        raise(NotImplementedError('Abstract class'))
+        raise NotImplementedError
 
 class coefficientWithLaggingAbstract:
     @property
     def aLagging(self):
-        raise(NotImplementedError('Abstract class'))
+        raise NotImplementedError
     
     
 class coefficientFine(coefficientAbstract):

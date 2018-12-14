@@ -81,7 +81,7 @@ class interiorpIndexMap_TestCase(unittest.TestCase):
 
     def test_examples(self):
         N = np.array([10])
-        self.assertTrue(np.all(util.interiorpIndexMap(N) == range(1,10)))
+        self.assertTrue(np.all(util.interiorpIndexMap(N) == list(range(1,10))))
 
         N = np.array([2,2,2,2])
         self.assertTrue(util.interiorpIndexMap(N) == [1+3+9+27])

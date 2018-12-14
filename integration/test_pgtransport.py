@@ -177,7 +177,7 @@ class IntegrationPGTransport_TestCase(unittest.TestCase):
                 plt.title('st projected')
                 plt.gcf().canvas.draw()
 
-                print np.sqrt(np.mean((stProjected-sT)**2))
+                print(np.sqrt(np.mean((stProjected-sT)**2)))
                 
                 plt.pause(0.0001)
         plt.show()

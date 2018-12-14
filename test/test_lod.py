@@ -4,6 +4,7 @@ import itertools as it
 
 from gridlod import lod, fem, interp, util, coef, world
 from gridlod.world import World
+from functools import reduce
 
 class ritzProjectionToFinePatch_TestCase(unittest.TestCase):
     def test_trivial(self):

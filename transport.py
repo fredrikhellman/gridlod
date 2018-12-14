@@ -1,10 +1,10 @@
 import numpy as np
 import scipy.sparse as sparse
 
-from world import World
-import util
-import fem
-import linalg
+from .world import World
+from . import util
+from . import fem
+from . import linalg
 
 def computeConservativeFlux(world, fluxTF, f=None):
     # From Odsaeter et al.

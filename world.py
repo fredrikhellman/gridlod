@@ -1,6 +1,6 @@
 import numpy as np
 
-import fem
+from . import fem
 
 class World:
     def __init__(self, NWorldCoarse, NCoarseElement, boundaryConditions = None):

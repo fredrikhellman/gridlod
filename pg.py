@@ -2,11 +2,11 @@ import numpy as np
 import scipy.sparse as sparse
 from copy import deepcopy
 
-import lod
-import util
-import fem
-import ecworker
-import eccontroller
+from . import lod
+from . import util
+from . import fem
+from . import ecworker
+from . import eccontroller
 
 class PetrovGalerkinLOD:
     def __init__(self, world, k, IPatchGenerator, epsilonTol, printLevel=0):
@@ -54,11 +54,11 @@ class PetrovGalerkinLOD:
             self.epsilonList = [np.nan]*NtCoarse
 
         if self.printLevel >= 2:
-            print 'Setting up workers'
+            print('Setting up workers')
 
         eccontroller.setupWorker(world, coefficient, IPatchGenerator, k, clearFineQuantities, self.printLevel)
         if self.printLevel >= 2:
-            print 'Done'
+            print('Done')
             
         ecList = self.ecList
         ageList = self.ageList
@@ -67,7 +67,7 @@ class PetrovGalerkinLOD:
         ecComputeList = []
         for TInd in range(NtCoarse):
             if self.printLevel >= 3:
-                print str(TInd) + ' / ' + str(NtCoarse),
+                print(str(TInd) + ' / ' + str(NtCoarse), end=' ')
 
             ageList[TInd] += 1
             iElement = util.convertpLinearIndexToCoordIndex(world.NWorldCoarse-1, TInd)
@@ -92,28 +92,28 @@ class PetrovGalerkinLOD:
             epsilonList[TInd] = epsilonT
             
             if self.printLevel >= 3:
-                print 'epsilonT = ' + str(epsilonT), 
+                print('epsilonT = ' + str(epsilonT), end=' ') 
                 
             if epsilonT == np.inf or epsilonT > epsilonTol:
                 if self.printLevel >= 3:
-                    print 'C'
+                    print('C')
                 ecComputeList.append((TInd, iElement))
                 ecList[TInd] = None
                 ageList[TInd] = 0
                 recomputeCount += 1
             else:
                 if self.printLevel >= 3:
-                    print 'N'
+                    print('N')
 
         if self.printLevel >= 2:
-            print 'Waiting for results', len(ecComputeList)
+            print('Waiting for results', len(ecComputeList))
 
         ecResultList = eccontroller.mapComputations(ecComputeList, self.printLevel)
         for ecResult, ecCompute in zip(ecResultList, ecComputeList):
             ecList[ecCompute[0]] = ecResult
 
         if self.printLevel > 0:
-            print "Recompute fraction", float(recomputeCount)/NtCoarse
+            print("Recompute fraction", float(recomputeCount)/NtCoarse)
                     
     def clearCorrectors(self):
         NtCoarse = np.prod(self.world.NWorldCoarse)
@@ -144,7 +144,7 @@ class PetrovGalerkinLOD:
         NtCoarse = np.prod(world.NWorldCoarse)
         for TInd in range(NtCoarse):
             if self.printLevel > 0:
-                print str(TInd) + ' / ' + str(NtCoarse)
+                print(str(TInd) + ' / ' + str(NtCoarse))
                 
             ecT = self.ecList[TInd]
             

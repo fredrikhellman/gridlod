@@ -4,7 +4,7 @@ import scipy.sparse.linalg
 
 import sys
 import time
-import util
+from . import util
 
 try:
     from sksparse.cholmod import cholesky, analyze
@@ -26,7 +26,7 @@ def linSolve(K, c):
         d = DHalfInv*c
 
         def cgCallback(xk):
-            print np.linalg.norm(B*xk-d)
+            print(np.linalg.norm(B*xk-d))
         
         y, info = sparse.linalg.minres(B, d, tol=1e-9, callback=cgCallback)
         x = DHalfInv*y
@@ -60,24 +60,24 @@ def saddle(A, B, rhsList):
     # Rename for brevity
             
     # Compute Y
-    print "A"
+    print("A")
     sys.stdout.flush()
     
     cholA = cholesky(A)
     Y = np.zeros((B.shape[1], B.shape[0]))
     for y, b in zip(Y.T, B):
-        print ".",
+        print(".", end=' ')
         sys.stdout.flush()
         
         y[:] = cholA.solve_A(np.array(b.todense()).T.squeeze())
 
-    print "B"
+    print("B")
     sys.stdout.flush()
         
     S = B*Y
     invS = np.linalg.inv(S)
 
-    print "C"
+    print("C")
     sys.stdout.flush()
 
     # Post-processing
@@ -87,7 +87,7 @@ def saddle(A, B, rhsList):
         x   = q - np.dot(Y,lam)
         xList.append(x)
 
-    print "D"
+    print("D")
     sys.stdout.flush()
         
     return xList
@@ -148,7 +148,7 @@ def saddleNullSpaceGeneralBasis(A, B, S, rhsList, coarseNodes):
         b = Z.T*(SPerm.T*rhs)
 
         def cgCallback(xk):
-            print np.linalg.norm(Z.T*(SPerm.T*(A*(SPerm*(Z*xk))))-b)
+            print(np.linalg.norm(Z.T*(SPerm.T*(A*(SPerm*(Z*xk))))-b))
             return
         
         mutableClosure.counter = 0
@@ -161,7 +161,7 @@ def saddleNullSpaceGeneralBasis(A, B, S, rhsList, coarseNodes):
         #print end-start
         
         if info != 0:
-            raise(FailedToConverge('CG failed to converge, info={}'.format(info)))
+            raise FailedToConverge
 
         totalDofs = A.shape[0]
         corrector = np.zeros(Np)
@@ -186,7 +186,7 @@ def saddleNullSpaceHierarchicalBasis(A, B, P, rhsList, coarseNodes, fixed):
     Nc = np.size(coarseNodes)
 
     if fixed is not None:
-        raise(NotImplementedError('Boundary conditions not implemented here yet....'))
+        raise NotImplementedError
     
     coarseNodesMask = np.zeros(Np, dtype='bool')
     coarseNodesMask[coarseNodes] = True
@@ -238,7 +238,7 @@ def saddleNullSpaceHierarchicalBasis(A, B, P, rhsList, coarseNodes, fixed):
         b = ZT*(ST*rhs[nodePermutation])
 
         def cgCallback(xk):
-            print str(np.size(xk)) + '  ' + str(np.linalg.norm(ZT*(ST*(APerm*(S*(Z*xk))))-b))
+            print(str(np.size(xk)) + '  ' + str(np.linalg.norm(ZT*(ST*(APerm*(S*(Z*xk))))-b)))
             return
         
         mutableClosure.counter = 0
@@ -250,7 +250,7 @@ def saddleNullSpaceHierarchicalBasis(A, B, P, rhsList, coarseNodes, fixed):
         end = time.time()
         #print end-start
         if info != 0:
-            raise(FailedToConverge('CG failed to converge, info={}'.format(info)))
+            raise FailedToConverge
 
         totalDofs = A.shape[0]
         corrector = np.zeros(Np)
@@ -315,8 +315,7 @@ def saddleNullSpace(A, B, rhsList, coarseNodes):
     
     Bbdiag = diagonalCsc(Bb)
     if Bbdiag is None:
-        raise(NotImplementedError('Can''t handle general interpolation ' +
-                                  'operators. Needs to be easy to find its null space...'))
+        raise NotImplementedError
         
     BbInv = Bbdiag.copy()
     BbInv.data = 1./BbInv.data
@@ -359,10 +358,10 @@ def saddleNullSpace(A, B, rhsList, coarseNodes):
         mutableClosure.counter = 0
         mutableClosure.timer = 0
         x,info = sparse.linalg.cg(ALinearOperator, b, tol=1e-9)
-        print mutableClosure.counter, mutableClosure.timer
+        print(mutableClosure.counter, mutableClosure.timer)
         
         if info != 0:
-            raise(FailedToConverge('CG failed to converge, info={}'.format(info)))
+            raise FailedToConverge
 
         totalDofs = A.shape[0]
         corrector = np.zeros(totalDofs)
@@ -435,21 +434,21 @@ class choleskyCache:
         self.factorCache = dict()
 
     def lookup(self, N, A):
-        print 'lookup'
+        print('lookup')
         index = np.dot(self.indexBasis, N)
         if index not in self.factorCache:
-            print 'miss'
+            print('miss')
             t = time.time()
             self.factorCache[index] = analyze(A)
             t = time.time()-t
-            print 'a', t
+            print('a', t)
         else:
-            print 'hit'
+            print('hit')
         cholAFactor = self.factorCache[index]
         t = time.time()
         cholAFactorReturn = cholAFactor.cholesky(A)
         t = time.time()-t
-        print 'c', t
+        print('c', t)
         return cholAFactorReturn
 
 def schurComplementSolve(A, B, bList, fixed, NPatchCoarse=None, NCoarseElement=None, cholCache=None):
@@ -467,8 +466,8 @@ def schurComplementSolve(A, B, bList, fixed, NPatchCoarse=None, NCoarseElement=N
         assert(NPatchCoarse is not None)
         assert(NCoarseElement is not None)
         N = NPatchCoarse*NCoarseElement
-        print A.shape
-        print A.nnz
+        print(A.shape)
+        print(A.nnz)
         cholA = cholCache.lookup(N, A)
     else:
         cholA = cholesky(A)

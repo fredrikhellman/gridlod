@@ -88,7 +88,7 @@ class evaluate_TestCase(unittest.TestCase):
                       [0.99]])
 
         cq1dOfX = func.evaluateCQ1D(N, cq1, x)
-        print cq1dOfX
+        print(cq1dOfX)
         cq1dShouldBe = np.array([[3.0], [6.0], [6.0], [300.0]])
 
         self.assertTrue(np.allclose(cq1dOfX, cq1dShouldBe))
