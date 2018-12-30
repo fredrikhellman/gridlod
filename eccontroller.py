@@ -2,7 +2,7 @@ client = None
 lview = None
 sendAr = None
 
-import ecworker
+from . import ecworker
 import ipyparallel as ipp
 
 def mapComputations(ecComputeList, printLevel=0):
@@ -14,12 +14,12 @@ def mapComputations(ecComputeList, printLevel=0):
         ecTList = []
         for TInd, iElement in ecComputeList:
             if printLevel >= 2:
-                print str(TInd) + ' : ' + str(resultCounter) + ' / ' + str(len(ecComputeList))
+                print(str(TInd) + ' : ' + str(resultCounter) + ' / ' + str(len(ecComputeList)))
             ecT = ecworker.computeElementCorrector(iElement)
             ecTList.append(ecT)
             resultCounter += 1
         if printLevel >= 2:
-            print 'Done'
+            print('Done')
         return ecTList
     else:
         sendAr.wait_interactive()
@@ -41,17 +41,17 @@ def setupWorker(world, coefficient, IPatchGenerator, k, clearFineQuantities, pri
             hasaBase = ar.get()
             if any(h is False for h in hasaBase):
                 if printLevel >= 2:
-                    print 'Sending large coefficient'
+                    print('Sending large coefficient')
                 sendAr = client[:].apply_async(ecworker.sendar, coefficient._aBase, coefficient._rCoarse)
             else:
                 if printLevel >= 2:
-                    print 'Sending small coefficient'
+                    print('Sending small coefficient')
                 sendAr = client[:].apply_async(ecworker.sendar, None, coefficient._rCoarse)
         elif hasattr(coefficient, 'aLagging'):
             ar = client[:].apply_async(setupWorkerWrapper, (world, None, None, k, clearFineQuantities))
             ar.wait()
             if printLevel >= 2:
-                print 'Sending both coefficients'
+                print('Sending both coefficients')
             sendAr = client[:].apply_async(ecworker.sendas, coefficient._aFine, coefficient._aLagging)
         else:
             sendAr = client[:].apply_async(setupWorkerWrapper, (world, coefficient, None, k, clearFineQuantities))

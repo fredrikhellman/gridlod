@@ -34,10 +34,10 @@ freeMask  = np.logical_not(fixedMask)
 
 #INodal = gridlod.interp.nodalPatchMatrix(gp.iPatchCoarse, gp.NPatchCoarse, g.NWorldCoarse, g.NCoarseElement)
 
-print "aha"
+print("aha")
 sys.stdout.flush()
 exit()
-print "oho"
+print("oho")
 
 up = np.sin(2*np.pi*p[:,0])*np.sin(2*np.pi*p[:,1])*np.sin(2*np.pi*p[:,2])
 fp = 3*4*(np.pi**2)*up
@@ -53,6 +53,6 @@ uFine[freeMask] = uFineFree
 
 uFineCube = uFine.reshape(NWorldFine+1)
 
-print np.sqrt(np.dot(uFine-up, AFull*(uFine-up)))
+print(np.sqrt(np.dot(uFine-up, AFull*(uFine-up))))
 
 imageToVTK("./image", pointData = {"u" : uFineCube} )

@@ -1,14 +1,14 @@
 import numpy as np
 import scipy.sparse as sparse
 
-import util
+from . import util
 
 def localMatrix(d, matrixValuesTakesBinaryIndices):
     def convertToBinaryIndices(f):
         return lambda *ind: f(np.array(ind[:d], dtype='bool'),
                               np.array(ind[d:], dtype='bool'))
 
-    ABin = np.fromfunction(convertToBinaryIndices(matrixValuesTakesBinaryIndices), shape=[2]*(2*d))
+    ABin = np.fromfunction(convertToBinaryIndices(matrixValuesTakesBinaryIndices), shape=[2]*(2*d), dtype='int64')
     AFlat = ABin.flatten('F')
     A = AFlat.reshape(2**d, 2**d, order='F')
     return A
@@ -27,7 +27,7 @@ def localStiffnessMatrix(N):
     detJ = np.prod(1./N)
     def stiffnessMatrixBinaryIndices(ib, jb):
         M = detJ*(1 << np.sum(~(ib ^ jb), axis=0))/6.**d
-        A = M*np.sum(map(np.multiply, N**2, 3*(1-3*(ib ^ jb))), axis=0)
+        A = M*np.sum(list(map(np.multiply, N**2, 3*(1-3*(ib ^ jb)))), axis=0)
         return A
     
     return localMatrix(d, stiffnessMatrixBinaryIndices)
@@ -227,7 +227,7 @@ def assembleHierarchicalBasisMatrix(NPatchCoarse, NCoarseElement):
     # Use simplest possible hierarchy, divide by two in all dimensions
     NLevelElement = NCoarseElement.copy()
     while np.all(np.mod(NLevelElement, 2) == 0):
-        NLevelElement /= 2
+        NLevelElement = NLevelElement // 2
 
     assert np.all(NLevelElement == 1)
         
@@ -238,7 +238,7 @@ def assembleHierarchicalBasisMatrix(NPatchCoarse, NCoarseElement):
     # Loop over levels
     while np.all(NLevelElement <= NCoarseElement):
         # Compute level basis functions on fine mesh
-        NCoarseLevel = NCoarseElement/NLevelElement
+        NCoarseLevel = NCoarseElement//NLevelElement
         NPatchLevel = NPatchCoarse*NCoarseLevel
         PLevel = assembleProlongationMatrix(NPatchLevel, NLevelElement)
         PLevel = PLevel.tocoo()

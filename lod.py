@@ -4,11 +4,11 @@ import scipy.sparse.linalg
 import gc
 import warnings
 
-import fem
-import util
-import linalg
-import coef
-import transport
+from . import fem
+from . import util
+from . import linalg
+from . import coef
+from . import transport
 
 # Saddle point problem solvers
 class nullspaceSolver:
@@ -17,7 +17,7 @@ class nullspaceSolver:
         self.coarseNodes = util.fillpIndexMap(NPatchCoarse, NPatchFine)
 
     def solve(self, A, I, bList, fixed, NPatchCoarse=None, NCoarseElement=None):
-        raise(NotImplementedError('Not maintained'))
+        raise NotImplementedError
         return linalg.saddleNullSpace(A, I, bList, self.coarseNodes)
 
 class nullspaceOneLevelHierarchySolver:
@@ -39,7 +39,7 @@ class nullspaceSeveralLevelsHierarchySolver:
         self.PHier = fem.assembleHierarchicalBasisMatrix(NPatchCoarse, NCoarseElement)
 
     def solve(self, A, I, bList, fixed, NPatchCoarse=None, NCoarseElement=None):
-        raise(NotImplementedError('Not maintained'))
+        raise NotImplementedError
         return linalg.saddleNullSpaceGeneralBasis(A, I, self.PHier, bList, self.coarseNodes)
 
 class blockDiagonalPreconditionerSolver:
@@ -47,7 +47,7 @@ class blockDiagonalPreconditionerSolver:
         pass
     
     def solve(self, A, I, bList, fixed, NPatchCoarse=None, NCoarseElement=None):
-        raise(NotImplementedError('Fix this!'))
+        raise NotImplementedError
         return linalg.solveWithBlockDiagonalPreconditioner(A, I, bList)
 
 class schurComplementSolver:
@@ -251,7 +251,7 @@ class elementCorrector:
         and store them in the self.fsi object, together with the extracted A|_{U_k(T)}
         '''
         d = np.size(self.NPatchCoarse)
-        ARhsList = map(np.squeeze, np.hsplit(self.world.localBasis, 2**d))
+        ARhsList = list(map(np.squeeze, np.hsplit(self.world.localBasis, 2**d)))
 
         correctorsList = self.computeElementCorrector(coefficientPatch, IPatch, ARhsList)
         

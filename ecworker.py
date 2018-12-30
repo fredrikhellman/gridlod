@@ -1,6 +1,6 @@
-import lod
-import interp
-import coef
+from . import lod
+from . import interp
+from . import coef
 
 from copy import deepcopy
 

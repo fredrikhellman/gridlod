@@ -41,6 +41,6 @@ u[freeMask] = uFree
 
 uCube = u.reshape(NWorld+1)
 
-print np.sqrt(np.dot(u-up, AFull*(u-up)))
+print(np.sqrt(np.dot(u-up, AFull*(u-up))))
 
 imageToVTK("./image", pointData = {"u" : uCube} )

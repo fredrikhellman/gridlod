@@ -462,7 +462,7 @@ class computeConservativeFlux_TestCase(unittest.TestCase):
                            [-2 , 3,  0, 0],
                            [-3 , 2,  0, 0]])
         conservativeFluxTF = transport.computeConservativeFlux(world, fluxTF)
-        print conservativeFluxTF
+        print(conservativeFluxTF)
         self.assertTrue(np.allclose(np.sum(conservativeFluxTF, axis=1), 0))
         
 if __name__ == '__main__':

@@ -5,16 +5,8 @@ import scipy.stats as stats
 from itertools import count
 import os
 
-from pyevtk.hl import imageToVTK 
-
 from gridlod import pg, interp, coef, util, fem, world, linalg, femsolver, transport
 from gridlod.world import World
-
-def saveCube(name, data, shape):
-    uCube = np.reshape(data, shape[::-1])
-    uCube = np.ascontiguousarray(np.transpose(uCube, axes=[2, 1, 0]))
-    imageToVTK(name, pointData = {"u" : uCube} )
-
 
 class PetrovGalerkinLOD_TestCase(unittest.TestCase):
     def test_alive(self):
@@ -49,7 +41,7 @@ class PetrovGalerkinLOD_TestCase(unittest.TestCase):
         NpFine = np.prod(NWorldFine+1)
         NtFine = np.prod(NWorldFine)
         NWorldCoarse = np.array([2, 2])
-        NCoarseElement = NWorldFine/NWorldCoarse
+        NCoarseElement = NWorldFine//NWorldCoarse
         NtCoarse = np.prod(NWorldCoarse)
         NpCoarse = np.prod(NWorldCoarse+1)
         
@@ -115,7 +107,7 @@ class PetrovGalerkinLOD_TestCase(unittest.TestCase):
         
         for N in NList:
             NWorldCoarse = np.array([N])
-            NCoarseElement = NFine/NWorldCoarse
+            NCoarseElement = NFine//NWorldCoarse
             boundaryConditions = np.array([[0, 0]])
             world = World(NWorldCoarse, NCoarseElement, boundaryConditions)
             
@@ -162,7 +154,7 @@ class PetrovGalerkinLOD_TestCase(unittest.TestCase):
     def test_1d_toReference(self):
         NWorldFine = np.array([200])
         NWorldCoarse = np.array([10])
-        NCoarseElement = NWorldFine/NWorldCoarse
+        NCoarseElement = NWorldFine//NWorldCoarse
         boundaryConditions = np.array([[0, 0]])
         world = World(NWorldCoarse, NCoarseElement, boundaryConditions)
 
@@ -222,7 +214,7 @@ class PetrovGalerkinLOD_TestCase(unittest.TestCase):
         NpFine = np.prod(NWorldFine+1)
         NtFine = np.prod(NWorldFine)
         NWorldCoarse = np.array([3, 4])
-        NCoarseElement = NWorldFine/NWorldCoarse
+        NCoarseElement = NWorldFine//NWorldCoarse
         NtCoarse = np.prod(NWorldCoarse)
         NpCoarse = np.prod(NWorldCoarse+1)
         
@@ -264,9 +256,9 @@ class PetrovGalerkinLOD_TestCase(unittest.TestCase):
         # First case is to not modify. Error should be 0
         # The other cases modify one, a few or half of the coarse elements to different degrees.
         rCoarseModPairs = [([], []), ([0], [2.]), ([10], [3.]), ([4, 3, 2], [1.3, 1.5, 1.8])]
-        rCoarseModPairs.append((range(NtCoarse/2), [2]*NtCoarse))
-        rCoarseModPairs.append((range(NtCoarse/2), [0.9]*NtCoarse))
-        rCoarseModPairs.append((range(NtCoarse/2), [0.95]*NtCoarse))
+        rCoarseModPairs.append((list(range(NtCoarse//2)), [2]*NtCoarse))
+        rCoarseModPairs.append((list(range(NtCoarse//2)), [0.9]*NtCoarse))
+        rCoarseModPairs.append((list(range(NtCoarse//2)), [0.95]*NtCoarse))
         
         for i, rCoarseModPair in zip(count(), rCoarseModPairs):
             for ind, val in zip(rCoarseModPair[0], rCoarseModPair[1]):
@@ -321,7 +313,7 @@ class PetrovGalerkinLOD_TestCase(unittest.TestCase):
         NpFine = np.prod(NWorldFine+1)
         NtFine = np.prod(NWorldFine)
         NWorldCoarse = np.array([2, 2])
-        NCoarseElement = NWorldFine/NWorldCoarse
+        NCoarseElement = NWorldFine//NWorldCoarse
         NtCoarse = np.prod(NWorldCoarse)
         NpCoarse = np.prod(NWorldCoarse+1)
         
@@ -382,7 +374,7 @@ class PetrovGalerkinLOD_TestCase(unittest.TestCase):
         NpFine = np.prod(NWorldFine+1)
         NtFine = np.prod(NWorldFine)
         NWorldCoarse = np.array([6, 22, 5])
-        NCoarseElement = NWorldFine/NWorldCoarse
+        NCoarseElement = NWorldFine//NWorldCoarse
         NtCoarse = np.prod(NWorldCoarse)
         NpCoarse = np.prod(NWorldCoarse+1)
         
@@ -394,82 +386,49 @@ class PetrovGalerkinLOD_TestCase(unittest.TestCase):
         aBase = np.loadtxt(os.path.dirname(os.path.realpath(__file__)) + '/data/upperness_x.txt')
         #aBase = aBase[::8]
 
-        
-        print 'a'
         coords = util.pCoordinates(NWorldFine)
         gFine = 1-coords[:,1]
         uFineFull, AFine, _ = femsolver.solveFine(world, aBase, None, -gFine, boundaryConditions)
-        print 'b'
         
         rCoarse = np.ones(NtCoarse)
         
         self.assertTrue(np.size(aBase) == NtFine)
 
-        if True:
-            IPatchGenerator = lambda i, N: interp.L2ProjectionPatchMatrix(i, N, NWorldCoarse, NCoarseElement, boundaryConditions)
-            aCoef = coef.coefficientCoarseFactor(NWorldCoarse, NCoarseElement, aBase, rCoarse)
+        IPatchGenerator = lambda i, N: interp.L2ProjectionPatchMatrix(i, N, NWorldCoarse, NCoarseElement, boundaryConditions)
+        aCoef = coef.coefficientCoarseFactor(NWorldCoarse, NCoarseElement, aBase, rCoarse)
         
-            k = 2
-            printLevel = 1
-            pglod = pg.PetrovGalerkinLOD(world, k, IPatchGenerator, 1e-1, printLevel)
-            pglod.updateCorrectors(aCoef, clearFineQuantities=True)
+        k = 2
+        printLevel = 1
+        pglod = pg.PetrovGalerkinLOD(world, k, IPatchGenerator, 1e-1, printLevel)
+        pglod.updateCorrectors(aCoef, clearFineQuantities=True)
 
-            KmsFull = pglod.assembleMsStiffnessMatrix()
+        KmsFull = pglod.assembleMsStiffnessMatrix()
 
-            coords = util.pCoordinates(NWorldCoarse)
-            g = 1-coords[:,1]
-            bFull = -KmsFull*g
+        coords = util.pCoordinates(NWorldCoarse)
+        g = 1-coords[:,1]
+        bFull = -KmsFull*g
             
-            boundaryMap = boundaryConditions==0
-            fixed = util.boundarypIndexMap(NWorldCoarse, boundaryMap)
-            free = np.setdiff1d(np.arange(0,NpCoarse), fixed)
+        boundaryMap = boundaryConditions==0
+        fixed = util.boundarypIndexMap(NWorldCoarse, boundaryMap)
+        free = np.setdiff1d(np.arange(0,NpCoarse), fixed)
 
-            KmsFree = KmsFull[free][:,free]
-            bFree = bFull[free]
+        KmsFree = KmsFull[free][:,free]
+        bFree = bFull[free]
 
-            xFree = sparse.linalg.spsolve(KmsFree, bFree)
+        xFree = sparse.linalg.spsolve(KmsFree, bFree)
 
-            uCoarse = np.zeros(NpCoarse)
-            uCoarse[free] = xFree
-            uCoarse += g
-            uCube = np.reshape(uCoarse, (NWorldCoarse+1)[::-1])
-            uCube = np.ascontiguousarray(np.transpose(uCube, axes=[2, 1, 0]))
-            
-            imageToVTK("./image", pointData = {"u" : uCube} )
+        uCoarse = np.zeros(NpCoarse)
+        uCoarse[free] = xFree
+        uCoarse += g
+        uCube = np.reshape(uCoarse, (NWorldCoarse+1)[::-1])
+        uCube = np.ascontiguousarray(np.transpose(uCube, axes=[2, 1, 0]))
 
-        if False:
-            coord = util.pCoordinates(NWorldCoarse)
-            uCoarse = coord[:,1].flatten()
-            uCube = np.reshape(uCoarse, (NWorldCoarse+1)[::-1])
-            uCube = np.ascontiguousarray(np.transpose(uCube, axes=[2, 1, 0]))
-            imageToVTK("./image", pointData = {"u" : uCube} )
-            
-        # basis = fem.assembleProlongationMatrix(NWorldCoarse, NCoarseElement)
-        # basisCorrectors = pglod.assembleBasisCorrectors()
-        # modifiedBasis = basis - basisCorrectors
-        # xFull = np.zeros(NpCoarse)
-        # xFull[free] = xFree
-        # uLodCoarse = basis*xFull
-        # uLodFine = modifiedBasis*xFull
-
-        #freeFine  = util.interiorpIndexMap(NWorldFine)
-        #AFine = fem.assemblePatchMatrix(NWorldFine, world.ALocFine, aBase)
-        #MFine = fem.assemblePatchMatrix(NWorldFine, world.MLocFine)
-        #bFine = MFine*np.ones(NpFine)
-        #AFineFree = AFine[freeFine][:,freeFine]
-        #bFineFree = bFine[freeFine]
-        #uFineFree = linalg.linSolve(AFine, bFine)
-        #uFineFull = np.zeros(NpFine)
-        #uFineFull[freeFine] = uFineFree
-
-        #np.savetxt('uFineFull', uFineFull)
-        
     def test_00coarseFlux(self):
         NWorldFine = np.array([20, 20])
         NpFine = np.prod(NWorldFine+1)
         NtFine = np.prod(NWorldFine)
         NWorldCoarse = np.array([4, 4])
-        NCoarseElement = NWorldFine/NWorldCoarse
+        NCoarseElement = NWorldFine//NWorldCoarse
         NtCoarse = np.prod(NWorldCoarse)
         NpCoarse = np.prod(NWorldCoarse+1)
         

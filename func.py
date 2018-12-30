@@ -1,4 +1,4 @@
-import util
+from . import util
 import numpy as np
 
 def _computeCoordinateIndexParts(N, coordinates):
