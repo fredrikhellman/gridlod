@@ -478,7 +478,64 @@ class elementCorrector:
         epsilonTSquare = np.max(np.real(eigenvalues))
 
         return np.sqrt(epsilonTSquare)
-    
+
+    def computeLocalCoarseErrorIndicator(self, delta):
+        assert (hasattr(self, 'csi'))
+        assert (self.csi.rCoarse is not None)
+
+        world = self.world
+        NPatchCoarse = world.NWorldCoarse
+        NCoarseElement = world.NCoarseElement
+
+        # for localize   #NAMECHANGING horribly #k included here
+        iElementPatchCoarse = self.iElementPatchCoarse
+        NSubPatchCoarse = self.NPatchCoarse
+        iSubPatchCoarse = self.iPatchWorldCoarse
+
+        # gibt den index in coarseTIndexMap an, der fuer das element steht
+        elementCoarseIndex = util.convertpCoordIndexToLinearIndex(NPatchCoarse - 1, iElementPatchCoarse)
+
+        # gibt die gestalt des patches an
+        coarseTIndexMap = util.lowerLeftpIndexMap(NSubPatchCoarse - 1, NPatchCoarse - 1)
+        # gibt den startindex fuer die obenliegende Gestalt an
+        coarseTStartIndex = util.convertpCoordIndexToLinearIndex(NPatchCoarse - 1, iSubPatchCoarse)
+
+        # wir nehmen an, dass rCoarse immer 1 ist, weil die aenderungen auf der fine skala stattfinden
+        # eigenvalue Problem
+        muTPrime = self.csi.muTPrime
+
+        numberOfElements = np.shape(coarseTIndexMap)[0]
+        NPatchFine = NPatchCoarse * NCoarseElement
+
+        ################## delta ##################
+        deltaMax = np.zeros(numberOfElements)
+        for i in range(0, numberOfElements):
+            # coarse Element Index
+            LeftCornerFineElement = util.convertpLinearIndexToCoordIndex(world.NWorldCoarse - 1,
+                                                                   coarseTIndexMap[i] + coarseTStartIndex)
+            # translate in fine
+            LeftCornerFineElement *= np.min(
+                NCoarseElement)  # minimum bei eventueller coarseelement1 ungl coraseelement2
+            Patching = np.array(
+                [np.min(NCoarseElement), np.min(NCoarseElement)])  # minimum bei eventueller ungenauigkeiten
+            indexing = util.lowerLeftpIndexMap(Patching - 1, NPatchFine - 1)
+            startIndex = util.convertpCoordIndexToLinearIndex(NPatchFine - 1, LeftCornerFineElement)
+
+            deltaMax[i] = np.max(delta[indexing + startIndex])
+
+        ############## ceta #########
+        Element = elementCoarseIndex + coarseTStartIndex
+        LeftCornerFineElement = util.convertpLinearIndexToCoordIndex(world.NWorldCoarse - 1, Element)
+        LeftCornerFineElement *= np.min(NCoarseElement)  # minimum bei eventueller coarseelement1 ungl coraseelement2
+        Patching = np.array([np.min(NCoarseElement), np.min(NCoarseElement)])  # minimum bei eventueller ungenauigkeiten
+        indexing = util.lowerLeftpIndexMap(Patching - 1, NPatchFine - 1)
+        startIndex = util.convertpCoordIndexToLinearIndex(NPatchFine - 1, LeftCornerFineElement)
+
+        ########## total ###########
+        epsilonTSquare = np.sum((deltaMax ** 2) * muTPrime)
+
+        return np.sqrt(epsilonTSquare)
+
 # def computeelementCorrectorDirichletBC(NPatchCoarse,
 #                                        NCoarseElement,
 #                                        iElementCoarse,
