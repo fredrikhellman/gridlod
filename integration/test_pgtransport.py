@@ -7,7 +7,6 @@ import os
 import sys
 
 import matplotlib.pyplot as plt
-from pyevtk.hl import imageToVTK 
 
 from gridlod import pg, transport, interp, coef, util, fem, world, linalg, femsolver
 from gridlod.world import World
@@ -105,7 +104,7 @@ class IntegrationPGTransport_TestCase(unittest.TestCase):
 
         ## First, compute flux on fine mesh
         def computeAvgVelocitiesTF(NFluxElement):
-            fluxWorld = World(NWorldFine/NFluxElement, NFluxElement, boundaryConditions)
+            fluxWorld = World(NWorldFine//NFluxElement, NFluxElement, boundaryConditions)
 
             if True:
                 avgFluxTF = transport.computeHarmonicMeanFaceFlux(fluxWorld.NWorldCoarse, fluxWorld.NWorldCoarse, NFluxElement, aBase, uFull)
@@ -129,8 +128,8 @@ class IntegrationPGTransport_TestCase(unittest.TestCase):
         sT = np.zeros(world.NtCoarse)
         st = np.zeros(world.NtFine)
 
-        nTime = 1e5
-        endTime = 1
+        nTime = 1e4
+        endTime = 1/1e1
         dTime = endTime/float(nTime)
         volt = np.prod(1./world.NWorldFine)
         volT = np.prod(1./world.NWorldCoarse)
@@ -144,7 +143,7 @@ class IntegrationPGTransport_TestCase(unittest.TestCase):
         
         for timeStep in np.arange(nTime):
             def computeElementNetFluxT(NFluxElement, avgFluxTF, sT):
-                fluxWorld = World(NWorldFine/NFluxElement, NFluxElement, boundaryConditions)
+                fluxWorld = World(NWorldFine//NFluxElement, NFluxElement, boundaryConditions)
                 netFluxT = transport.computeElementNetFlux(fluxWorld, avgFluxTF, sT, boundarys, fractionalFlow)
                 return netFluxT
 
