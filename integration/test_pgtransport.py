@@ -179,7 +179,7 @@ class IntegrationPGTransport_TestCase(unittest.TestCase):
                 print(np.sqrt(np.mean((stProjected-sT)**2)))
                 
                 plt.pause(0.0001)
-        plt.show()
+        #plt.show()
 '''            
         ###
         nodeFluxes = np.zeros(NpCoarse)
