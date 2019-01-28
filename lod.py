@@ -11,7 +11,7 @@ from . import coef
 from . import transport
 
 # Saddle point problem solvers
-class nullspaceSolver:
+class NullspaceSolver:
     def __init__(self, NPatchCoarse, NCoarseElement):
         NPatchFine = NPatchCoarse*NCoarseElement
         self.coarseNodes = util.fillpIndexMap(NPatchCoarse, NPatchFine)
@@ -20,7 +20,7 @@ class nullspaceSolver:
         raise NotImplementedError
         return linalg.saddleNullSpace(A, I, bList, self.coarseNodes)
 
-class nullspaceOneLevelHierarchySolver:
+class NullspaceOneLevelHierarchySolver:
     def __init__(self, NPatchCoarse, NCoarseElement):
         NPatchFine = NPatchCoarse*NCoarseElement
         self.coarseNodes = util.fillpIndexMap(NPatchCoarse, NPatchFine)
@@ -32,7 +32,7 @@ class nullspaceOneLevelHierarchySolver:
     def solve(self, A, I, bList, fixed, NPatchCoarse=None, NCoarseElement=None):
         return linalg.saddleNullSpaceHierarchicalBasis(A, I, self.PPatch, bList, self.coarseNodes, fixed)
 
-class nullspaceSeveralLevelsHierarchySolver:
+class NullspaceSeveralLevelsHierarchySolver:
     def __init__(self, NPatchCoarse, NCoarseElement):
         NPatchFine = NPatchCoarse*NCoarseElement
         self.coarseNodes = util.fillpIndexMap(NPatchCoarse, NPatchFine)
@@ -42,7 +42,7 @@ class nullspaceSeveralLevelsHierarchySolver:
         raise NotImplementedError
         return linalg.saddleNullSpaceGeneralBasis(A, I, self.PHier, bList, self.coarseNodes)
 
-class blockDiagonalPreconditionerSolver:
+class BlockDiagonalPreconditionerSolver:
     def __init__(self):
         pass
     
@@ -50,7 +50,7 @@ class blockDiagonalPreconditionerSolver:
         raise NotImplementedError
         return linalg.solveWithBlockDiagonalPreconditioner(A, I, bList)
 
-class schurComplementSolver:
+class SchurComplementSolver:
     def __init__(self, NCache=None):
         if NCache is not None:
             self.cholCache = linalg.choleskyCache(NCache)
@@ -60,7 +60,7 @@ class schurComplementSolver:
     def solve(self, A, I, bList, fixed, NPatchCoarse=None, NCoarseElement=None):
         return linalg.schurComplementSolve(A, I, bList, fixed, NPatchCoarse, NCoarseElement, self.cholCache)
 
-class directSolver:
+class DirectSolver:
     def __init__(self):
         pass
     
@@ -74,8 +74,8 @@ def ritzProjectionToFinePatch(world,
                               bPatchFullList,
                               IPatch):
 
-    #saddleSolver = nullspaceOneLevelHierarchySolver(NPatchCoarse, NCoarseElement)
-    saddleSolver = schurComplementSolver()  # Fast for small patch problems
+    #saddleSolver = NullspaceOneLevelHierarchySolver(NPatchCoarse, NCoarseElement)
+    saddleSolver = SchurComplementSolver()  # Fast for small patch problems
     
     return ritzProjectionToFinePatchWithGivenSaddleSolver(world,
                                                           iPatchWorldCoarse,
@@ -126,18 +126,13 @@ class FineScaleInformation:
         self.correctorsList = correctorsList
 
 class CoarseScaleInformation:
-    def __init__(self, Kij, Kmsij, muTPrime, correctorFluxTF, basisFluxTF, rCoarse=None):
+    def __init__(self, Kij, Kmsij, muTPrime):
         self.Kij = Kij
         self.Kmsij = Kmsij
         #self.LTPrimeij = LTPrimeij
         self.muTPrime = muTPrime
-        self.rCoarse = rCoarse
-        self.correctorFluxTF = correctorFluxTF
-        self.basisFluxTF = basisFluxTF
-
-
         
-class elementCorrector:
+class ElementCorrector:
     def __init__(self, world, k, iElementWorldCoarse, saddleSolver=None):
         self.k = k
         self.iElementWorldCoarse = iElementWorldCoarse[:]
@@ -153,7 +148,7 @@ class elementCorrector:
         self.iPatchWorldCoarse = iPatchWorldCoarse
 
         if saddleSolver == None:
-            self._saddleSolver = schurComplementSolver()
+            self._saddleSolver = SchurComplementSolver()
         else:
             self._saddleSolver = saddleSolver
             
@@ -241,6 +236,12 @@ class elementCorrector:
                                                                         self.saddleSolver)
         return correctorsList
 
+class CoarseBasisElementCorrector(ElementCorrector):
+    def __init__(self):
+        super().__init__()
+        self.fsi = None
+        self.csi = None
+        
     def computeCorrectors(self, coefficientPatch, IPatch):
         '''Compute the fine correctors over the patch.
 
@@ -257,6 +258,60 @@ class elementCorrector:
         
         self.fsi = FineScaleInformation(coefficientPatch, correctorsList)
         
+    def clearFineQuantities(self):
+        self.fsi = None
+
+    def computeErrorIndicatorFine(self, coefficientNew):
+        assert(fsi is not None)
+
+        NPatchCoarse = self.NPatchCoarse
+        world = self.world
+        NCoarseElement = world.NCoarseElement
+        NPatchFine = NPatchCoarse*NCoarseElement
+        
+        a = coefficientNew.aFine
+
+        assert(a.ndim == 1 or a.ndim == 3)
+        
+        if a.ndim == 1:
+            ALocFine = world.ALocFine
+        else:
+            ALocFine = world.ALocMatrixFine
+        P = world.localBasis
+
+        aTilde = self.fsi.coefficient.aFine
+
+        TFinetIndexMap = util.lowerLeftpIndexMap(NCoarseElement-1, NPatchFine-1)
+        iElementPatchFine = self.iElementPatchCoarse*NCoarseElement
+        TFinetStartIndex = util.convertpCoordIndexToLinearIndex(NPatchFine-1, iElementPatchFine)
+
+        # Compute A^-1 (A_T - A)**2. This has to be done in a batch. inv works batchwise
+        if a.ndim == 1:
+            b = 1./a*(aTilde-a)**2
+        else:
+            aInv = np.linalg.inv(a)
+            b = np.einsum('Tij, Tjl, Tlk -> Tik', aInv, aTilde - a, aTilde - a)
+        
+        bT = b[TFinetStartIndex + TFinetIndexMap]
+        PatchNorm = fem.assemblePatchMatrix(NPatchFine, ALocFine, b)
+        TNorm = fem.assemblePatchMatrix(NCoarseElement, ALocFine, bT)
+        
+        BNorm = fem.assemblePatchMatrix(NCoarseElement, ALocFine, a[TFinetStartIndex + TFinetIndexMap])
+
+        TFinepIndexMap = util.lowerLeftpIndexMap(NCoarseElement, NPatchFine)
+        TFinepStartIndex = util.convertpCoordIndexToLinearIndex(NPatchFine, iElementPatchFine)
+
+        Q = np.column_stack(self.fsi.correctorsList)
+        QT = Q[TFinepStartIndex + TFinepIndexMap,:]
+
+        A = np.dot((P-QT).T, TNorm*(P-QT)) + np.dot(Q.T, PatchNorm*Q)
+        B = np.dot(P.T, BNorm*P)
+
+        eigenvalues = scipy.linalg.eigvals(A[:-1,:-1], B[:-1,:-1])
+        epsilonTSquare = np.max(np.real(eigenvalues))
+
+        return np.sqrt(epsilonTSquare)
+
     def computeCoarseQuantities(self):
         '''Compute the coarse quantities K and L for this element corrector
 
@@ -273,7 +328,7 @@ class elementCorrector:
 
         LTT'ij = (A \nabla (chi_T - Q_T)lambda_j, \nabla (chi_T - Q_T) lambda_j)_{T'}
         '''
-        assert(hasattr(self, 'fsi'))
+        assert(self.fsi is not None)
 
         world = self.world
         NCoarseElement = world.NCoarseElement
@@ -347,141 +402,10 @@ class elementCorrector:
             eigenvalues = scipy.linalg.eigvals(LTPrimeij[TPrimeInd][:-1,:-1], Kij[:-1,:-1])
             muTPrime[TPrimeInd] = np.max(np.real(eigenvalues))
 
-        if aPatch.ndim == 1:
-            # Face flux computations are only possible for scalar coefficients
-            # Compute coarse element face flux for basis and Q (not yet implemented for R)
-            correctorFluxTF = transport.computeHarmonicMeanFaceFlux(world.NWorldCoarse,
-                                                                    NPatchCoarse,
-                                                                    NCoarseElement, aPatch, QPatch)
-
-            # Need to compute over at least one fine element over the
-            # boundary of the main element to make the harmonic average
-            # right.  Note: We don't do this for correctorFluxTF, beause
-            # we do not have access to a outside the patch...
-            localBasisExtended = np.zeros_like(QPatch)
-            localBasisExtended[TPrimeFinepStartIndices[TInd] + TPrimeFinepIndexMap,:] = localBasis
-            basisFluxTF = transport.computeHarmonicMeanFaceFlux(world.NWorldCoarse,
-                                                                NPatchCoarse,
-                                                                NCoarseElement, aPatch, localBasisExtended)[:,TInd,:]
-        else:
-            # For non-scalar A we cannot compute these flux-quantities (yet)
-            basisFluxTF = None
-            correctorFluxTF = None
-
-        if isinstance(self.fsi.coefficient, coef.coefficientCoarseFactorAbstract):
-            rCoarse = self.fsi.coefficient.rCoarse
-        else:
-            rCoarse = None
-        self.csi = CoarseScaleInformation(Kij, Kmsij, muTPrime, correctorFluxTF, basisFluxTF, rCoarse)
-
-    def clearFineQuantities(self):
-        assert(hasattr(self, 'fsi'))
-        del self.fsi
-
-    def computeErrorIndicatorFineWithLagging(self, a, aTilde):
-        assert(hasattr(self, 'csi'))
-
-        assert(a.ndim == 1) # Matrix-valued A not supported in thus function yet
+        self.csi = CoarseScaleInformation(Kij, Kmsij, muTPrime)
         
-        world = self.world
-        NPatchCoarse = self.NPatchCoarse
-        NCoarseElement = world.NCoarseElement
-        NPatchFine = NPatchCoarse*NCoarseElement
-        iElementPatchCoarse = self.iElementPatchCoarse
-
-        elementCoarseIndex = util.convertpCoordIndexToLinearIndex(NPatchCoarse-1, iElementPatchCoarse)
-        
-        TPrimeFinetStartIndices = util.pIndexMap(NPatchCoarse-1, NPatchFine-1, NCoarseElement)
-        TPrimeFinetIndexMap = util.lowerLeftpIndexMap(NCoarseElement-1, NPatchFine-1)
-
-        muTPrime = self.csi.muTPrime
-
-        TPrimeIndices = np.add.outer(TPrimeFinetStartIndices, TPrimeFinetIndexMap)
-        aTPrime = a[TPrimeIndices]
-        aTildeTPrime = aTilde[TPrimeIndices]
-        
-        deltaMaxNormTPrime = np.max(np.abs((aTPrime - aTildeTPrime)/np.sqrt(aTPrime*aTildeTPrime)), axis=1)
-        theOtherUnnamedFactorTPrime = np.max(np.abs(aTPrime[elementCoarseIndex]/aTildeTPrime[elementCoarseIndex]))
-
-        epsilonTSquare = theOtherUnnamedFactorTPrime * \
-                         np.sum((deltaMaxNormTPrime**2)*muTPrime)
-
-        return np.sqrt(epsilonTSquare)
-        
-    def computeErrorIndicator(self, rCoarseNew):
-        assert(hasattr(self, 'csi'))
-        assert(self.csi.rCoarse is not None)
-        
-        world = self.world
-        NPatchCoarse = self.NPatchCoarse
-        NCoarseElement = world.NCoarseElement
-        iElementPatchCoarse = self.iElementPatchCoarse
-
-        elementCoarseIndex = util.convertpCoordIndexToLinearIndex(NPatchCoarse-1, iElementPatchCoarse)
-        
-        rCoarse = self.csi.rCoarse
-        muTPrime = self.csi.muTPrime
-        deltaMaxNormTPrime = np.abs((rCoarseNew - rCoarse)/np.sqrt(rCoarseNew*rCoarse))
-        
-        epsilonTSquare = rCoarseNew[elementCoarseIndex]/rCoarse[elementCoarseIndex] * \
-                         np.sum((deltaMaxNormTPrime**2)*muTPrime)
-
-        return np.sqrt(epsilonTSquare)
-
-    def computeErrorIndicatorFine(self, coefficientNew):
-        assert(hasattr(self, 'fsi'))
-
-        NPatchCoarse = self.NPatchCoarse
-        world = self.world
-        NCoarseElement = world.NCoarseElement
-        NPatchFine = NPatchCoarse*NCoarseElement
-        
-        a = coefficientNew.aFine
-
-        assert(a.ndim == 1 or a.ndim == 3)
-        
-        if a.ndim == 1:
-            ALocFine = world.ALocFine
-        else:
-            ALocFine = world.ALocMatrixFine
-        P = world.localBasis
-
-        aTilde = self.fsi.coefficient.aFine
-
-        TFinetIndexMap = util.lowerLeftpIndexMap(NCoarseElement-1, NPatchFine-1)
-        iElementPatchFine = self.iElementPatchCoarse*NCoarseElement
-        TFinetStartIndex = util.convertpCoordIndexToLinearIndex(NPatchFine-1, iElementPatchFine)
-
-        # Compute A^-1 (A_T - A)**2. This has to be done in a batch. inv works batchwise
-        if a.ndim == 1:
-            b = 1./a*(aTilde-a)**2
-        else:
-            aInv = np.linalg.inv(a)
-            b = np.einsum('Tij, Tjl, Tlk -> Tik', aInv, aTilde - a, aTilde - a)
-        
-        bT = b[TFinetStartIndex + TFinetIndexMap]
-        PatchNorm = fem.assemblePatchMatrix(NPatchFine, ALocFine, b)
-        TNorm = fem.assemblePatchMatrix(NCoarseElement, ALocFine, bT)
-        
-        BNorm = fem.assemblePatchMatrix(NCoarseElement, ALocFine, a[TFinetStartIndex + TFinetIndexMap])
-
-        TFinepIndexMap = util.lowerLeftpIndexMap(NCoarseElement, NPatchFine)
-        TFinepStartIndex = util.convertpCoordIndexToLinearIndex(NPatchFine, iElementPatchFine)
-
-        Q = np.column_stack(self.fsi.correctorsList)
-        QT = Q[TFinepStartIndex + TFinepIndexMap,:]
-
-        A = np.dot((P-QT).T, TNorm*(P-QT)) + np.dot(Q.T, PatchNorm*Q)
-        B = np.dot(P.T, BNorm*P)
-
-        eigenvalues = scipy.linalg.eigvals(A[:-1,:-1], B[:-1,:-1])
-        epsilonTSquare = np.max(np.real(eigenvalues))
-
-        return np.sqrt(epsilonTSquare)
-
     def computeLocalCoarseErrorIndicator(self, delta):
-        assert (hasattr(self, 'csi'))
-        assert (self.csi.rCoarse is not None)
+        assert(self.csi is not None)
 
         world = self.world
         NPatchCoarse = world.NWorldCoarse
@@ -500,8 +424,6 @@ class elementCorrector:
         # gibt den startindex fuer die obenliegende Gestalt an
         coarseTStartIndex = util.convertpCoordIndexToLinearIndex(NPatchCoarse - 1, iSubPatchCoarse)
 
-        # wir nehmen an, dass rCoarse immer 1 ist, weil die aenderungen auf der fine skala stattfinden
-        # eigenvalue Problem
         muTPrime = self.csi.muTPrime
 
         numberOfElements = np.shape(coarseTIndexMap)[0]
@@ -536,51 +458,3 @@ class elementCorrector:
 
         return np.sqrt(epsilonTSquare)
 
-# def computeelementCorrectorDirichletBC(NPatchCoarse,
-#                                        NCoarseElement,
-#                                        iElementCoarse,
-#                                        APatchFull,
-#                                        AElementFull,
-#                                        localBasis,
-#                                        IPatch):
-
-#     ## HALLER PA HAR
-    
-#     # Compute rhs
-#     fineIndexBasis = util.linearpIndexBasis(NPatchFine)
-#     elementFineIndex = np.dot(fineIndexBasis, iElementCoarse*NCoarseElement)
-#     bFull = np.zeros(NpFine)
-#     bFreeList = []
-#     for phi in localBasis:
-#         bFull[elementFineIndex + elementToFineIndexMap] = AElementFull*phi
-#         bFreeList.append(bFull[freePatch])
-
-#     # Prepare IPatchFree
-#     IPatchFree = IPatch[:,freePatch]
-#     linalg.saddleNullSpace(APatchFree, IPatchFree, bFreeList)
-    
-#     if IPatch is None:
-#         correctorFreeList = []
-#         for bFree in bFreeList:
-#             correctorFree,_ = sparse.linalg.cg(APatchFree, bFree, tol=1e-9)
-#             correctorFreeList.append(correctorFree)
-#     else:
-#         IPatchFree = IPatch[:,freePatch]
-#         correctorFreeList = linalg.saddle(APatchFree, IPatchFree, bFreeList)
-
-#     correctorFullList = []
-#     for correctorFree in correctorFreeList:
-#         correctorFull = np.zeros(NpFine)
-#         correctorFull[freePatch] = correctorFree
-#         correctorFullList.append(correctorFull)
-        
-#     return correctorFullList
-
-#def computePetrovGalerkinStiffnessMatrix(NWorldCoarse,
-#                                         NCoarseElement,
-#                                         aFlatFine,
-#                                         IElement,
-#                                         k):
-#    
-#
-#def ritzProjectionToFinePatch(gp, ICoarseElement)

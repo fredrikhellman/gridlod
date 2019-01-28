@@ -128,8 +128,8 @@ class IntegrationPGTransport_TestCase(unittest.TestCase):
         sT = np.zeros(world.NtCoarse)
         st = np.zeros(world.NtFine)
 
-        nTime = 1e4
-        endTime = 1/1e1
+        nTime = 1e2
+        endTime = 1/1e3
         dTime = endTime/float(nTime)
         volt = np.prod(1./world.NWorldFine)
         volT = np.prod(1./world.NWorldCoarse)
@@ -159,7 +159,7 @@ class IntegrationPGTransport_TestCase(unittest.TestCase):
             #st[st < 0] = 0.
 
 
-            if timeStep%1000 == 0 or timeStep == nTime-1:
+            if timeStep%100 == 0 or timeStep == nTime-1:
                 plt.figure(h1)
                 drawSaturation(NWorldCoarse, sT)
                 plt.title('sT')
@@ -178,8 +178,8 @@ class IntegrationPGTransport_TestCase(unittest.TestCase):
 
                 print(np.sqrt(np.mean((stProjected-sT)**2)))
                 
-                plt.pause(0.0001)
-        plt.show()
+                plt.pause(0.000001)
+        #plt.show()
 '''            
         ###
         nodeFluxes = np.zeros(NpCoarse)

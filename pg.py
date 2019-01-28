@@ -9,16 +9,16 @@ from . import ecworker
 from . import eccontroller
 
 class PetrovGalerkinLOD:
-    def __init__(self, world, k, IPatchGenerator, epsilonTol, printLevel=0):
+    def __init__(self, world, k, IPatchGenerator, correctorClass, epsilonTol, printLevel=0):
         self.world = world
         NtCoarse = np.prod(world.NWorldCoarse)
         self.k = k
         self.IPatchGenerator = IPatchGenerator
         self.epsilonTol = epsilonTol
         self.printLevel = printLevel
-
+        self.correctorClass = correctorClass
+        
         self.epsilonList = None
-        self.ageList = None
         self.ecList = None
         self.Kms = None
         self.K = None
@@ -47,9 +47,6 @@ class PetrovGalerkinLOD:
         if self.ecList is None:
             self.ecList = [None]*NtCoarse
 
-        if self.ageList is None:
-            self.ageList = [-1]*NtCoarse
-
         if self.epsilonList is None:
             self.epsilonList = [np.nan]*NtCoarse
 
@@ -61,7 +58,6 @@ class PetrovGalerkinLOD:
             print('Done')
             
         ecList = self.ecList
-        ageList = self.ageList
         epsilonList = self.epsilonList
         recomputeCount = 0
         ecComputeList = []
@@ -69,22 +65,11 @@ class PetrovGalerkinLOD:
             if self.printLevel >= 3:
                 print(str(TInd) + ' / ' + str(NtCoarse), end=' ')
 
-            ageList[TInd] += 1
             iElement = util.convertpLinearIndexToCoordIndex(world.NWorldCoarse-1, TInd)
             if ecList[TInd] is not None:
                 ecT = ecList[TInd]
-                if hasattr(coefficient, 'aLagging'):
-                    coefficientPatch = coefficient.localize(ecT.iPatchWorldCoarse, ecT.NPatchCoarse)
-                    epsilonT = ecList[TInd].computeErrorIndicatorFineWithLagging(coefficientPatch.aFine, coefficientPatch.aLagging)
-                elif hasattr(coefficient, 'rCoarse'):
-                    coefficientPatch = coefficient.localize(ecT.iPatchWorldCoarse, ecT.NPatchCoarse)
-                    epsilonT = ecList[TInd].computeErrorIndicator(coefficientPatch.rCoarse)
-                elif hasattr(ecT, 'fsi'):
-                    coefficientPatch = coefficient.localize(ecT.iPatchWorldCoarse, ecT.NPatchCoarse)
-                    epsilonT = ecList[TInd].computeErrorIndicatorFine(coefficientPatch)
-                else:
-                    coefficientPatch = None
-                    epsilonT = np.inf
+                coefficientPatch = coefficient.localize(ecT.iPatchWorldCoarse, ecT.NPatchCoarse)
+                epsilonT = ecList[TInd].computeErrorIndicator(coefficientPatch)
             else:
                 coefficientPatch = None
                 epsilonT = np.inf
@@ -97,9 +82,8 @@ class PetrovGalerkinLOD:
             if epsilonT == np.inf or epsilonT > epsilonTol:
                 if self.printLevel >= 3:
                     print('C')
-                ecComputeList.append((TInd, iElement))
+                ecComputeList.append((TInd, iElement, self.correctorClass))
                 ecList[TInd] = None
-                ageList[TInd] = 0
                 recomputeCount += 1
             else:
                 if self.printLevel >= 3:
@@ -188,15 +172,15 @@ class PetrovGalerkinLOD:
 
         for TInd in np.arange(NtCoarse):
             ecT = self.ecList[TInd]
-            assert(hasattr(ecT, 'csi'))
+            assert(hasattr(ecT, 'csiFlux'))
 
             patchtStartIndex = util.convertpCoordIndexToLinearIndex(NWorldCoarse-1, ecT.iPatchWorldCoarse)
             patchtIndexMap = util.lowerLeftpIndexMap(ecT.NPatchCoarse-1, NWorldCoarse-1)
             elementpIndex = elementpStartIndices[TInd] + elementpIndexMap
 
             patchtIndices = patchtStartIndex + patchtIndexMap
-            fluxTF[TInd,:] += np.einsum('iF, i -> F', ecT.csi.basisFluxTF, u[elementpIndex])
-            fluxTF[patchtIndices,:] -= np.einsum('iTF, i -> TF', ecT.csi.correctorFluxTF, u[elementpIndex])
+            fluxTF[TInd,:] += np.einsum('iF, i -> F', ecT.csiFlux.basisFluxTF, u[elementpIndex])
+            fluxTF[patchtIndices,:] -= np.einsum('iTF, i -> TF', ecT.csiFlux.correctorFluxTF, u[elementpIndex])
 
         return fluxTF
     

@@ -2,23 +2,26 @@ import numpy as np
 
 from . import util
 
-class coefficientAbstract:
+class CoefficientAbstract:
     @property
     def aFine(self):
         raise NotImplementedError
 
-class coefficientCoarseFactorAbstract:
+    def localize(self, iSubPatchCoarse, NSubPatchCoarse):
+        raise NotImplementedError
+    
+class CoefficientCoarseFactorAbstract:
     @property
     def rCoarse(self):
         raise NotImplementedError
 
-class coefficientWithLaggingAbstract:
+class CoefficientWithLaggingAbstract:
     @property
     def aLagging(self):
         raise NotImplementedError
     
     
-class coefficientFine(coefficientAbstract):
+class CoefficientFine(CoefficientAbstract):
     def __init__(self, NPatchCoarse, NCoarseElement, aFine):
         self.NPatchCoarse = np.array(NPatchCoarse)
         self.NCoarseElement = NCoarseElement
@@ -37,14 +40,14 @@ class coefficientFine(coefficientAbstract):
         coarsetStartIndex = util.convertpCoordIndexToLinearIndex(NPatchFine-1, iSubPatchFine)
         aFineLocalized = self._aFine[coarsetStartIndex + coarsetIndexMap]
 
-        localizedCoefficient = coefficientFine(NSubPatchCoarse, NCoarseElement, aFineLocalized)
+        localizedCoefficient = CoefficientFine(NSubPatchCoarse, NCoarseElement, aFineLocalized)
         return localizedCoefficient
 
     @property
     def aFine(self):
         return self._aFine
 
-class coefficientFineWithLagging(coefficientWithLaggingAbstract):
+class CoefficientFineWithLagging(CoefficientWithLaggingAbstract):
     def __init__(self, NPatchCoarse, NCoarseElement, aFine, aLagging):
         self.NPatchCoarse = np.array(NPatchCoarse)
         self.NCoarseElement = NCoarseElement
@@ -65,7 +68,7 @@ class coefficientFineWithLagging(coefficientWithLaggingAbstract):
         aFineLocalized = self._aFine[coarsetStartIndex + coarsetIndexMap]
         aLaggingLocalized = self._aLagging[coarsetStartIndex + coarsetIndexMap]
 
-        localizedCoefficient = coefficientFineWithLagging(NSubPatchCoarse, NCoarseElement,
+        localizedCoefficient = CoefficientFineWithLagging(NSubPatchCoarse, NCoarseElement,
                                                           aFineLocalized, aLaggingLocalized)
         return localizedCoefficient
 
@@ -77,7 +80,7 @@ class coefficientFineWithLagging(coefficientWithLaggingAbstract):
     def aLagging(self):
         return self._aLagging
     
-class coefficientCoarseFactor(coefficientAbstract, coefficientCoarseFactorAbstract):
+class CoefficientCoarseFactor(CoefficientAbstract, CoefficientCoarseFactorAbstract):
     def __init__(self, NPatchCoarse, NCoarseElement, aBase, rCoarse):
         self.NPatchCoarse = np.array(NPatchCoarse)
         self.NCoarseElement = NCoarseElement
@@ -123,7 +126,7 @@ class coefficientCoarseFactor(coefficientAbstract, coefficientCoarseFactorAbstra
         coarsetStartIndex = util.convertpCoordIndexToLinearIndex(NPatchFine-1, iSubPatchFine)
         aLocalized = a[coarsetStartIndex + coarsetIndexMap]
 
-        localizedCoefficient = coefficientCoarseFactor(NSubPatchCoarse, NCoarseElement, None, rCoarseLocalized)
+        localizedCoefficient = CoefficientCoarseFactor(NSubPatchCoarse, NCoarseElement, None, rCoarseLocalized)
         if not hasattr(self, '_aFine'):
             localizedCoefficient._aBase = aLocalized
         else:
