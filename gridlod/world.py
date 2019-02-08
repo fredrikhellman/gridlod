@@ -1,6 +1,7 @@
 import numpy as np
 
 from . import fem
+from . import util
 
 class World:
     def __init__(self, NWorldCoarse, NCoarseElement, boundaryConditions = None):
@@ -75,3 +76,28 @@ class World:
         if not hasattr(self, '_FLocFine'):
             self._FLocFine = fem.localFaceMassMatrix(self.NWorldCoarse*self.NCoarseElement)
         return self._FLocFine
+
+class Patch:
+    def __init__(self, world, k, TInd):
+        self.world = world
+        self.k = k
+        self.TInd = TInd
+
+        iElementWorldCoarse = util.convertpLinearIndexToCoordIndex(world.NWorldCoarse-1, TInd)[:]
+        self.iElementWorldCoarse = iElementWorldCoarse
+        
+        # Compute (NPatchCoarse, iElementPatchCoarse) from (k, iElementWorldCoarse, NWorldCoarse)
+        d = np.size(iElementWorldCoarse)
+        NWorldCoarse = world.NWorldCoarse
+        iPatchWorldCoarse = np.maximum(0, iElementWorldCoarse - k).astype('int64')
+        iEndPatchWorldCoarse = np.minimum(NWorldCoarse - 1, iElementWorldCoarse + k).astype('int64') + 1
+        self.NPatchCoarse = iEndPatchWorldCoarse-iPatchWorldCoarse
+        self.iElementPatchCoarse = iElementWorldCoarse - iPatchWorldCoarse
+        self.iPatchWorldCoarse = iPatchWorldCoarse
+
+        self.NPatchFine = self.NPatchCoarse*world.NCoarseElement
+        
+        self.NpFine = np.prod(self.NPatchFine+1)
+        self.NtFine = np.prod(self.NPatchFine)
+        self.NpCoarse = np.prod(self.NPatchCoarse+1)
+        self.NtCoarse = np.prod(self.NPatchCoarse)
