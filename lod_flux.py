@@ -19,13 +19,13 @@ class CoarseScaleInformationFlux:
         self.basisFluxTF = basisFluxTF
 
 class CoarseBasisElementCorrectorFlux(lod.CoarseBasisElementCorrector):
-    def __init__(self):
-        super().__init__()
+    def __init__(self, world, k, iElementWorldCoarse, IPatchGenerator, saddleSolver=None):
+        super().__init__(world, k, iElementWorldCoarse, IPatchGenerator, saddleSolver=None)
         self.csiFlux = None
     
     def computeCoarseQuantitiesFlux(self):
         assert(self.fsi is not None)
-
+        
         world = self.world
         NCoarseElement = world.NCoarseElement
         NPatchCoarse = self.NPatchCoarse
@@ -58,7 +58,7 @@ class CoarseBasisElementCorrectorFlux(lod.CoarseBasisElementCorrector):
             basisFluxTF = transport.computeHarmonicMeanFaceFlux(world.NWorldCoarse,
                                                                 NPatchCoarse,
                                                                 NCoarseElement, aPatch, localBasisExtended)[:,TInd,:]
-        if isinstance(self.fsi.coefficient, coef.coefficientCoarseFactorAbstract):
+        if isinstance(self.fsi.coefficient, coef.CoefficientCoarseFactorAbstract):
             rCoarse = self.fsi.coefficient.rCoarse
         else:
             rCoarse = None

@@ -23,28 +23,28 @@ class lod_flux_TestCase(unittest.TestCase):
         iElementWorldCoarse = np.array([3,3])
 
         rCoarseFirst = 1+3*np.random.rand(NtWorldCoarse)
-        coefFirst = coef.coefficientCoarseFactor(NWorldCoarse, NCoarseElement, aBase, rCoarseFirst)
-        ec = lod_flux.ElementCorrectorFlux(world, k, iElementWorldCoarse)
-        IPatch = interp.L2ProjectionPatchMatrix(ec.iPatchWorldCoarse, ec.NPatchCoarse, NWorldCoarse, NCoarseElement)
-        ec.computeCorrectors(coefFirst, IPatch)
+        coefFirst = coef.CoefficientCoarseFactor(NWorldCoarse, NCoarseElement, aBase, rCoarseFirst)
+        IPatchGenerator = lambda i, N: interp.L2ProjectionPatchMatrix(i, N, NWorldCoarse, NCoarseElement)
+        ec = lod_flux.CoarseBasisElementCorrectorFlux(world, k, iElementWorldCoarse, IPatchGenerator)
+        ec.computeCorrectors(coefFirst)
         ec.computeCoarseQuantities()
 
         # If both rCoarseFirst and rCoarseSecond are equal, the error indicator should be zero
         rCoarseSecond = np.array(rCoarseFirst)
         self.assertTrue(np.isclose(ec.computeCoarseErrorIndicatorFlux(rCoarseSecond), 0))
 
-        coefSecond = coef.coefficientCoarseFactor(NWorldCoarse, NCoarseElement, aBase, rCoarseSecond)
-        self.assertTrue(np.isclose(ec.computeCoarseErrorIndicatorFluxFine(coefSecond), 0))
+        coefSecond = coef.CoefficientCoarseFactor(NWorldCoarse, NCoarseElement, aBase, rCoarseSecond)
+        self.assertTrue(np.isclose(ec.computeErrorIndicatorFine(coefSecond), 0))
         
         # If rCoarseSecond is not rCoarseFirst, the error indicator should not be zero
         rCoarseSecond = 2*np.array(rCoarseFirst)
         self.assertTrue(ec.computeCoarseErrorIndicatorFlux(rCoarseSecond) >= 0.1)
 
-        coefSecond = coef.coefficientCoarseFactor(NWorldCoarse, NCoarseElement, aBase, rCoarseSecond)
-        self.assertTrue(ec.computeCoarseErrorIndicatorFluxFine(coefSecond) >= 0.1)
+        coefSecond = coef.CoefficientCoarseFactor(NWorldCoarse, NCoarseElement, aBase, rCoarseSecond)
+        self.assertTrue(ec.computeErrorIndicatorFine(coefSecond) >= 0.1)
 
         # Fine should be smaller than coarse estimate
-        self.assertTrue(ec.computeCoarseErrorIndicatorFluxFine(coefSecond) < ec.computeCoarseErrorIndicatorFlux(rCoarseSecond))
+        self.assertTrue(ec.computeErrorIndicatorFine(coefSecond) < ec.computeCoarseErrorIndicatorFlux(rCoarseSecond))
 
         # If rCoarseSecond is different in the element itself, the error
         # indicator should be large
@@ -54,10 +54,10 @@ class lod_flux_TestCase(unittest.TestCase):
         saveForNextTest = ec.computeCoarseErrorIndicatorFlux(rCoarseSecond)
         self.assertTrue(saveForNextTest >= 0.1)
 
-        coefSecond = coef.coefficientCoarseFactor(NWorldCoarse, NCoarseElement, aBase, rCoarseSecond)
-        fineResult = ec.computeCoarseErrorIndicatorFluxFine(coefSecond)
+        coefSecond = coef.CoefficientCoarseFactor(NWorldCoarse, NCoarseElement, aBase, rCoarseSecond)
+        fineResult = ec.computeErrorIndicatorFine(coefSecond)
         self.assertTrue(fineResult >= 0.1)
-        self.assertTrue(ec.computeCoarseErrorIndicatorFluxFine(coefSecond) < ec.computeCoarseErrorIndicatorFlux(rCoarseSecond))
+        self.assertTrue(ec.computeErrorIndicatorFine(coefSecond) < ec.computeCoarseErrorIndicatorFlux(rCoarseSecond))
 
         # A difference in the perifery should be smaller than in the center
         rCoarseSecond = np.array(rCoarseFirst)

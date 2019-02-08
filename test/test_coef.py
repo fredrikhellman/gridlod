@@ -10,7 +10,7 @@ class coefficientCoarseFactor_TestCase(unittest.TestCase):
         NPatchCoarse = np.array([2, 2])
         NCoarseElement = np.array([3, 1])
 
-        coefFirst = coef.coefficientCoarseFactor(NPatchCoarse, NCoarseElement, aBase, rCoarse)
+        coefFirst = coef.CoefficientCoarseFactor(NPatchCoarse, NCoarseElement, aBase, rCoarse)
 
         aFine = coefFirst.aFine
         self.assertTrue(np.all(aFine == [10, 20, 30, 60, 40, 20, 400, 500, 600, 1200, 1000, 800]))
@@ -22,7 +22,7 @@ class coefficientCoarseFactor_TestCase(unittest.TestCase):
         aFineLocalized = coefLocalized.aFine
         self.assertTrue(np.all(aFineLocalized == [400, 500, 600]))
         
-        coefLocalizeFirst = coef.coefficientCoarseFactor(NPatchCoarse, NCoarseElement, aBase, rCoarse)
+        coefLocalizeFirst = coef.CoefficientCoarseFactor(NPatchCoarse, NCoarseElement, aBase, rCoarse)
         coefLocalizedFirst = coefLocalizeFirst.localize(iSubPatchCoarse, NSubPatchCoarse)
         aFineLocalizedFirst = coefLocalizedFirst.aFine
 

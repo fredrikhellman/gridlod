@@ -121,9 +121,10 @@ def ritzProjectionToFinePatchWithGivenSaddleSolver(world,
     return projectionsList
 
 class FineScaleInformation:
-    def __init__(self, coefficientPatch, correctorsList):
+    def __init__(self, coefficientPatch, correctorsList, IPatch):
         self.coefficient = coefficientPatch
         self.correctorsList = correctorsList
+        self.IPatch = IPatch
 
 class CoarseScaleInformation:
     def __init__(self, Kij, Kmsij, muTPrime):
@@ -133,10 +134,11 @@ class CoarseScaleInformation:
         self.muTPrime = muTPrime
         
 class ElementCorrector:
-    def __init__(self, world, k, iElementWorldCoarse, saddleSolver=None):
+    def __init__(self, world, k, iElementWorldCoarse, IPatchGenerator, saddleSolver=None):
         self.k = k
         self.iElementWorldCoarse = iElementWorldCoarse[:]
         self.world = world
+        self.IPatchGenerator = IPatchGenerator
 
         # Compute (NPatchCoarse, iElementPatchCoarse) from (k, iElementWorldCoarse, NWorldCoarse)
         d = np.size(iElementWorldCoarse)
@@ -152,6 +154,8 @@ class ElementCorrector:
         else:
             self._saddleSolver = saddleSolver
             
+        self.fsi = None
+            
     @property
     def saddleSolver(self):
         return self._saddleSolver
@@ -160,7 +164,7 @@ class ElementCorrector:
     def saddleSolver(self, value):
         self._saddleSolver = value
             
-    def computeElementCorrector(self, coefficientPatch, IPatch, ARhsList=None, MRhsList=None):
+    def computeElementCorrector(self, coefficientPatch, ARhsList=None, MRhsList=None):
         '''Compute the fine correctors over the patch.
 
         Compute the correctors
@@ -184,6 +188,8 @@ class ElementCorrector:
         NPatchCoarse = self.NPatchCoarse
         d = np.size(NCoarseElement)
 
+        IPatch = self.IPatchGenerator(self.iPatchWorldCoarse, self.NPatchCoarse)
+        
         NPatchFine = NPatchCoarse*NCoarseElement
         NtFine = np.prod(NPatchFine)
         NpFineCoarseElement = np.prod(NCoarseElement+1)
@@ -234,15 +240,18 @@ class ElementCorrector:
                                                                         bPatchFullList,
                                                                         IPatch,
                                                                         self.saddleSolver)
-        return correctorsList
+        
+        self.fsi = FineScaleInformation(coefficientPatch, correctorsList, IPatch)
+
+    def clearFineQuantities(self):
+        self.fsi = None
 
 class CoarseBasisElementCorrector(ElementCorrector):
-    def __init__(self):
-        super().__init__()
-        self.fsi = None
+    def __init__(self, world, k, iElementWorldCoarse, IPatchGenerator, saddleSolver=None):
+        super().__init__(world, k, iElementWorldCoarse, IPatchGenerator, saddleSolver=None)
         self.csi = None
         
-    def computeCorrectors(self, coefficientPatch, IPatch):
+    def computeCorrectors(self, coefficientPatch):
         '''Compute the fine correctors over the patch.
 
         Compute the correctors Q_T\lambda_i (T is given by the class instance):
@@ -254,15 +263,10 @@ class CoarseBasisElementCorrector(ElementCorrector):
         d = np.size(self.NPatchCoarse)
         ARhsList = list(map(np.squeeze, np.hsplit(self.world.localBasis, 2**d)))
 
-        correctorsList = self.computeElementCorrector(coefficientPatch, IPatch, ARhsList)
+        self.computeElementCorrector(coefficientPatch, ARhsList)
         
-        self.fsi = FineScaleInformation(coefficientPatch, correctorsList)
-        
-    def clearFineQuantities(self):
-        self.fsi = None
-
     def computeErrorIndicatorFine(self, coefficientNew):
-        assert(fsi is not None)
+        assert(self.fsi is not None)
 
         NPatchCoarse = self.NPatchCoarse
         world = self.world
@@ -404,7 +408,7 @@ class CoarseBasisElementCorrector(ElementCorrector):
 
         self.csi = CoarseScaleInformation(Kij, Kmsij, muTPrime)
         
-    def computeLocalCoarseErrorIndicator(self, delta):
+    def computeErrorIndicatorCoarse(self, delta):
         assert(self.csi is not None)
 
         world = self.world

@@ -73,7 +73,7 @@ class ritzProjectionToFinePatch_TestCase(unittest.TestCase):
                                                                    IPatch)[0]
 
             for saddleSolver in [#lod.nullspaceOneLevelHierarchySolver(NPatchCoarse, NCoarseElement),
-                                 lod.schurComplementSolver()]:
+                                 lod.SchurComplementSolver()]:
                 projection = lod.ritzProjectionToFinePatchWithGivenSaddleSolver(world, iPatchWorldCoarse, NPatchCoarse,                                                                             APatchFull, bPatchFullList,
                                                                                 IPatch, saddleSolver)[0]
                 self.assertTrue(np.isclose(np.max(np.abs(projectionCheckAgainst-projection)), 0))
@@ -85,29 +85,30 @@ class corrector_TestCase(unittest.TestCase):
         NWorldCoarse = np.array([4, 4])
         NCoarseElement = np.array([2,2])
         world = World(NWorldCoarse, NCoarseElement)
+        IPatchGenerator = lambda i, N: None
 
         k = 1
 
         iElementWorldCoarse = np.array([0, 0])
-        ec = lod.ElementCorrector(world, k, iElementWorldCoarse)
+        ec = lod.ElementCorrector(world, k, iElementWorldCoarse, IPatchGenerator)
         self.assertTrue(np.all(ec.NPatchCoarse == [2, 2]))
         self.assertTrue(np.all(ec.iElementPatchCoarse == [0, 0]))
         self.assertTrue(np.all(ec.iPatchWorldCoarse == [0, 0]))
         
         iElementWorldCoarse = np.array([0, 3])
-        ec = lod.ElementCorrector(world, k, iElementWorldCoarse)
+        ec = lod.ElementCorrector(world, k, iElementWorldCoarse, IPatchGenerator)
         self.assertTrue(np.all(ec.NPatchCoarse == [2, 2]))
         self.assertTrue(np.all(ec.iElementPatchCoarse == [0, 1]))
         self.assertTrue(np.all(ec.iPatchWorldCoarse == [0, 2]))
 
         iElementWorldCoarse = np.array([0, 2])
-        ec = lod.ElementCorrector(world, k, iElementWorldCoarse)
+        ec = lod.ElementCorrector(world, k, iElementWorldCoarse, IPatchGenerator)
         self.assertTrue(np.all(ec.NPatchCoarse == [2, 3]))
         self.assertTrue(np.all(ec.iElementPatchCoarse == [0, 1]))
         self.assertTrue(np.all(ec.iPatchWorldCoarse == [0, 1]))
 
         iElementWorldCoarse = np.array([1, 2])
-        ec = lod.ElementCorrector(world, k, iElementWorldCoarse)
+        ec = lod.ElementCorrector(world, k, iElementWorldCoarse, IPatchGenerator)
         self.assertTrue(np.all(ec.NPatchCoarse == [3, 3]))
         self.assertTrue(np.all(ec.iElementPatchCoarse == [1, 1]))
         self.assertTrue(np.all(ec.iPatchWorldCoarse == [0, 1]))
@@ -120,16 +121,16 @@ class corrector_TestCase(unittest.TestCase):
         
         k = 1
         iElementWorldCoarse = np.array([2, 1, 2])
-        ec = lod.ElementCorrector(world, k, iElementWorldCoarse)
-        IPatch = interp.L2ProjectionPatchMatrix(ec.iPatchWorldCoarse, ec.NPatchCoarse, NWorldCoarse, NCoarseElement)
+        IPatchGenerator = lambda i, N: interp.L2ProjectionPatchMatrix(i, N, NWorldCoarse, NCoarseElement)
+        ec = lod.CoarseBasisElementCorrector(world, k, iElementWorldCoarse, IPatchGenerator)
 
         NtPatch = np.prod(ec.NPatchCoarse*NCoarseElement)
 
         np.random.seed(1)
 
         aPatch = np.random.rand(NtPatch)
-        coefficientPatch = coef.coefficientFine(ec.NPatchCoarse, NCoarseElement, aPatch)
-        ec.computeCorrectors(coefficientPatch, IPatch)
+        coefficientPatch = coef.CoefficientFine(ec.NPatchCoarse, NCoarseElement, aPatch)
+        ec.computeCorrectors(coefficientPatch)
         ec.computeCoarseQuantities()
 
         TFinetIndexMap   = util.extractElementFine(ec.NPatchCoarse,
@@ -166,12 +167,12 @@ class corrector_TestCase(unittest.TestCase):
         
         k = 1
         iElementWorldCoarse = np.array([2, 1, 2])
-        ec = lod.ElementCorrector(world, k, iElementWorldCoarse)
-        IPatch = interp.nodalPatchMatrix(ec.iPatchWorldCoarse, ec.NPatchCoarse, NWorldCoarse, NCoarseElement)
+        IPatchGenerator = lambda i, N: interp.nodalPatchMatrix(i, N, NWorldCoarse, NCoarseElement)
+        ec = lod.CoarseBasisElementCorrector(world, k, iElementWorldCoarse, IPatchGenerator)
 
         NtPatch = np.prod(ec.NPatchCoarse*NCoarseElement)
-        coefficientPatch = coef.coefficientFine(ec.NPatchCoarse, NCoarseElement, np.ones(NtPatch))
-        ec.computeCorrectors(coefficientPatch, IPatch)
+        coefficientPatch = coef.CoefficientFine(ec.NPatchCoarse, NCoarseElement, np.ones(NtPatch))
+        ec.computeCorrectors(coefficientPatch)
 
         correctorSum = reduce(np.add, ec.fsi.correctorsList)
         self.assertTrue(np.allclose(correctorSum, 0))
@@ -208,7 +209,7 @@ class corrector_TestCase(unittest.TestCase):
         d = np.size(NWorldCoarse)
         IWorld = interp.nodalPatchMatrix(0*NWorldCoarse, NWorldCoarse, NWorldCoarse, NCoarseElement)
         aWorld = np.exp(np.random.rand(NtWorldFine))
-        coefficientWorld = coef.coefficientFine(NWorldCoarse, NCoarseElement, aWorld)
+        coefficientWorld = coef.CoefficientFine(NWorldCoarse, NCoarseElement, aWorld)
         k = np.max(NWorldCoarse)
 
         elementpIndexMap = util.lowerLeftpIndexMap(np.ones_like(NWorldCoarse), NWorldCoarse)
@@ -222,8 +223,8 @@ class corrector_TestCase(unittest.TestCase):
         
         for iElementWorldCoarse in it.product(*[np.arange(n, dtype='int64') for n in NWorldCoarse]):
             iElementWorldCoarse = np.array(iElementWorldCoarse)
-            ec = lod.ElementCorrector(world, k, iElementWorldCoarse)
-            ec.computeCorrectors(coefficientWorld, IWorld)
+            ec = lod.CoarseBasisElementCorrector(world, k, iElementWorldCoarse, lambda x, y: IWorld)
+            ec.computeCorrectors(coefficientWorld)
             
             worldpIndices = np.dot(coarsepBasis, iElementWorldCoarse) + elementpIndexMap
             correctors[:,worldpIndices] += np.column_stack(ec.fsi.correctorsList)
@@ -268,7 +269,7 @@ class corrector_TestCase(unittest.TestCase):
         for IPatch in [interp.L2ProjectionPatchMatrix(0*NPatchCoarse, NPatchCoarse, NPatchCoarse, NCoarseElement),
                        interp.nodalPatchMatrix(0*NPatchCoarse, NPatchCoarse, NPatchCoarse, NCoarseElement)]:
 
-            schurComplementSolver = lod.schurComplementSolver()
+            schurComplementSolver = lod.SchurComplementSolver()
             schurComplementSolution = lod.ritzProjectionToFinePatchWithGivenSaddleSolver(world, iPatchWorldCoarse, NPatchCoarse,
                                                                                          APatchFull, bPatchFullList,
                                                                                          IPatch,
