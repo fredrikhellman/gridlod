@@ -110,6 +110,11 @@ class CoarseScaleInformation:
         self.Kij = Kij
         self.Kmsij = Kmsij
         self.muTPrime = muTPrime
+
+class CoarseScaleInformationFlux:
+    def __init__(self, correctorFluxTF, basisFluxTF):
+        self.correctorFluxTF = correctorFluxTF
+        self.basisFluxTF = basisFluxTF
         
 def computeElementCorrector(patch, IPatch, aPatch, ARhsList=None, MRhsList=None, saddleSolver=None):
     '''Compute the fine correctors over a patch.
@@ -200,7 +205,10 @@ def computeBasisCorrectors(patch, IPatch, aPatch, saddleSolver=None):
 
     
 def computeErrorIndicatorFine(patch, correctorsList, aPatchOld, aPatchNew):
-    assert(self.fsi is not None)
+    ''' Compute the fine error idicator e(T). 
+    
+    This requires all correctors and the new and old coefficient.
+    '''
 
     NPatchCoarse = patch.NPatchCoarse
     world = patch.world
@@ -247,6 +255,39 @@ def computeErrorIndicatorFine(patch, correctorsList, aPatchOld, aPatchNew):
 
     eigenvalues = scipy.linalg.eigvals(A[:-1,:-1], B[:-1,:-1])
     epsilonTSquare = np.max(np.real(eigenvalues))
+
+    return np.sqrt(epsilonTSquare)
+
+def computeErrorIndicatorCoarseExact(patch, muTPrime, aPatchOld, aPatchNew):
+    ''' Compute the coarse error idicator E(T) with explicit value of AOld and ANew.
+    
+    This requires muTPrime from CSI and the new and old coefficient.
+    '''
+    assert(a.ndim == 1) # Matrix-valued A not supported in thus function yet
+
+    aTilde = aPatchOld
+    a = aPatchNew
+    
+    world = patch.world
+    NPatchCoarse = patch.NPatchCoarse
+    NCoarseElement = world.NCoarseElement
+    NPatchFine = NPatchCoarse*NCoarseElement
+    iElementPatchCoarse = patch.iElementPatchCoarse
+
+    elementCoarseIndex = util.convertpCoordIndexToLinearIndex(NPatchCoarse-1, iElementPatchCoarse)
+
+    TPrimeFinetStartIndices = util.pIndexMap(NPatchCoarse-1, NPatchFine-1, NCoarseElement)
+    TPrimeFinetIndexMap = util.lowerLeftpIndexMap(NCoarseElement-1, NPatchFine-1)
+
+    TPrimeIndices = np.add.outer(TPrimeFinetStartIndices, TPrimeFinetIndexMap)
+    aTPrime = a[TPrimeIndices]
+    aTildeTPrime = aTilde[TPrimeIndices]
+
+    deltaMaxNormTPrime = np.max(np.abs((aTPrime - aTildeTPrime)/np.sqrt(aTPrime*aTildeTPrime)), axis=1)
+    theOtherUnnamedFactorTPrime = np.max(np.abs(aTPrime[elementCoarseIndex]/aTildeTPrime[elementCoarseIndex]))
+
+    epsilonTSquare = theOtherUnnamedFactorTPrime * \
+                     np.sum((deltaMaxNormTPrime**2)*muTPrime)
 
     return np.sqrt(epsilonTSquare)
 
@@ -391,3 +432,36 @@ def computeErrorIndicatorCoarse(self, delta):
 
     return np.sqrt(epsilonTSquare)
 
+def computeCoarseQuantitiesFlux(patch, correctorsList, aPatch):
+    world = patch.world
+    NCoarseElement = world.NCoarseElement
+    NPatchCoarse = patch.NPatchCoarse
+    NPatchFine = NPatchCoarse*NCoarseElement
+
+    correctorsList = correctorsList
+    QPatch = np.column_stack(correctorsList)
+
+    localBasis = world.localBasis
+
+    TPrimeFinepStartIndices = util.pIndexMap(NPatchCoarse-1, NPatchFine, NCoarseElement)
+    TPrimeFinepIndexMap = util.lowerLeftpIndexMap(NCoarseElement, NPatchFine)
+
+    TInd = util.convertpCoordIndexToLinearIndex(NPatchCoarse-1, patch.iElementPatchCoarse)
+
+    if aPatch.ndim == 1:
+        # Face flux computations are only possible for scalar coefficients
+        # Compute coarse element face flux for basis and Q (not yet implemented for R)
+        correctorFluxTF = transport.computeHarmonicMeanFaceFlux(world.NWorldCoarse,
+                                                                NPatchCoarse,
+                                                                NCoarseElement, aPatch, QPatch)
+
+        # Need to compute over at least one fine element over the
+        # boundary of the main element to make the harmonic average
+        # right.  Note: We don't do this for correctorFluxTF, beause
+        # we do not have access to a outside the patch...
+        localBasisExtended = np.zeros_like(QPatch)
+        localBasisExtended[TPrimeFinepStartIndices[TInd] + TPrimeFinepIndexMap,:] = localBasis
+        basisFluxTF = transport.computeHarmonicMeanFaceFlux(world.NWorldCoarse,
+                                                            NPatchCoarse,
+                                                            NCoarseElement, aPatch, localBasisExtended)[:,TInd,:]
+    return CoarseScaleInformationFlux(correctorFluxTF, basisFluxTF)
