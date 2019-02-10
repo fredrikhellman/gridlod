@@ -124,6 +124,13 @@ def computeElementCorrector(patch, IPatch, aPatch, ARhsList=None, MRhsList=None,
     (A \nabla Q_T_j, \nabla vf)_{U_K(T)} = (A \nabla ARhs_j, \nabla vf)_{T} + (MRhs_j, vf)_{T}
     '''
 
+    while callable(IPatch):
+        IPatch = IPatch()
+        
+    while callable(aPatch):
+        aPatch = aPatch()
+    
+    
     assert(ARhsList is not None or MRhsList is not None)
     numRhs = None
 
@@ -198,6 +205,13 @@ def computeBasisCorrectors(patch, IPatch, aPatch, saddleSolver=None):
 
     (A \nabla Q_T lambda_j, \nabla vf)_{U_K(T)} = (A \nabla lambda_j, \nabla vf)_{T}
     '''
+
+    while callable(IPatch):
+        IPatch = IPatch()
+
+    while callable(aPatch):
+        aPatch = aPatch()
+    
     d = np.size(patch.NPatchCoarse)
     ARhsList = list(map(np.squeeze, np.hsplit(patch.world.localBasis, 2**d)))
 
@@ -209,6 +223,12 @@ def computeErrorIndicatorFine(patch, correctorsList, aPatchOld, aPatchNew):
     
     This requires all correctors and the new and old coefficient.
     '''
+
+    while callable(aPatchOld):
+        aPatchOld = aPatchOld()
+
+    while callable(aPatchNew):
+        aPatchNew = aPatchNew()
 
     NPatchCoarse = patch.NPatchCoarse
     world = patch.world
@@ -263,11 +283,21 @@ def computeErrorIndicatorCoarseExact(patch, muTPrime, aPatchOld, aPatchNew):
     
     This requires muTPrime from CSI and the new and old coefficient.
     '''
-    assert(a.ndim == 1) # Matrix-valued A not supported in thus function yet
 
+    while callable(muTPrime):
+        muTPrime = muTPrime()
+
+    while callable(aPatchOld):
+        aPatchOld = aPatchOld()
+
+    while callable(aPatchNew):
+        aPatchNew = aPatchNew()
+        
     aTilde = aPatchOld
     a = aPatchNew
     
+    assert(a.ndim == 1) # Matrix-valued A not supported in thus function yet
+
     world = patch.world
     NPatchCoarse = patch.NPatchCoarse
     NCoarseElement = world.NCoarseElement
@@ -307,6 +337,10 @@ def computeCoarseQuantities(patch, correctorsList, aPatch):
 
     LTT'ij = (A \nabla (chi_T - Q_T)lambda_j, \nabla (chi_T - Q_T) lambda_j)_{T'}
     '''
+    
+    while callable(aPatch):
+        aPatch = aPatch()
+        
     world = patch.world
     NCoarseElement = world.NCoarseElement
     NPatchCoarse = patch.NPatchCoarse
@@ -433,6 +467,10 @@ def computeErrorIndicatorCoarse(self, delta):
     return np.sqrt(epsilonTSquare)
 
 def computeCoarseQuantitiesFlux(patch, correctorsList, aPatch):
+
+    while callable(aPatch):
+        aPatch = aPatch()
+    
     world = patch.world
     NCoarseElement = world.NCoarseElement
     NPatchCoarse = patch.NPatchCoarse

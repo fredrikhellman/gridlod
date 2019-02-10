@@ -5,7 +5,11 @@ from copy import deepcopy
 from . import util
 from . import fem
 
-def assembleBasisCorrectors(world, ecList):
+def assembleBasisCorrectors(world, patchT, basisCorrectorsListT):
+    '''Compute the basis correctors given the elementwise basis
+    correctors for each coarse element.
+
+    '''
     NWorldCoarse = world.NWorldCoarse
     NCoarseElement = world.NCoarseElement
     NWorldFine = NWorldCoarse*NCoarseElement
@@ -21,19 +25,18 @@ def assembleBasisCorrectors(world, ecList):
     rows = []
     data = []
     for TInd in range(NtCoarse):
-        ecT = ecList[TInd]
-        assert(ecT is not None)
-        assert(ecT.fsi is not None)
-
-        NPatchFine = ecT.NPatchCoarse*NCoarseElement
-        iPatchWorldFine = ecT.iPatchWorldCoarse*NCoarseElement
+        basisCorrectorsList = basisCorrectorsListT[TInd]
+        patch = patchT[TInd]
+        
+        NPatchFine = patch.NPatchCoarse*NCoarseElement
+        iPatchWorldFine = patch.iPatchWorldCoarse*NCoarseElement
 
         patchpIndexMap = util.lowerLeftpIndexMap(NPatchFine, NWorldFine)
         patchpStartIndex = util.convertpCoordIndexToLinearIndex(NWorldFine, iPatchWorldFine)
 
         colsT = TpStartIndices[TInd] + TpIndexMap
         rowsT = patchpStartIndex + patchpIndexMap
-        dataT = np.hstack(ecT.fsi.correctorsList)
+        dataT = np.hstack(basisCorrectorsList)
 
         cols.extend(np.repeat(colsT, np.size(rowsT)))
         rows.extend(np.tile(rowsT, np.size(colsT)))
@@ -43,7 +46,11 @@ def assembleBasisCorrectors(world, ecList):
 
     return basisCorrectors
         
-def assembleMsStiffnessMatrix(world, ecList):
+def assembleMsStiffnessMatrix(world, KmsijT):
+    '''Compute the multiscale Petrov-Galerking stiffness matrix given
+    Kmsij for each coarse element.
+
+    '''
     NWorldCoarse = world.NWorldCoarse
 
     NtCoarse = np.prod(world.NWorldCoarse)
@@ -56,9 +63,7 @@ def assembleMsStiffnessMatrix(world, ecList):
     rows = []
     data = []
     for TInd in range(NtCoarse):
-        ecT = ecList[TInd]
-        assert(ecT is not None)
-        assert(ecT.csi is not None)
+        Kmsij = KmsijT[TInd]
 
         NPatchCoarse = ecT.NPatchCoarse
 
@@ -67,7 +72,7 @@ def assembleMsStiffnessMatrix(world, ecList):
 
         colsT = TpStartIndices[TInd] + TpIndexMap
         rowsT = patchpStartIndex + patchpIndexMap
-        dataT = ecT.csi.Kmsij.flatten()
+        dataT = Kmsij.flatten()
 
         cols.extend(np.tile(colsT, np.size(rowsT)))
         rows.extend(np.repeat(rowsT, np.size(colsT)))
@@ -77,7 +82,11 @@ def assembleMsStiffnessMatrix(world, ecList):
 
     return Kms
 
-def assembleStiffnessMatrix(world, ecList):
+def assembleStiffnessMatrix(world, KijT):
+    '''Compute the standard coarse stiffness matrix given Kij for each
+    coarse element.
+
+    '''
     world = self.world
     NWorldCoarse = world.NWorldCoarse
 
@@ -91,14 +100,13 @@ def assembleStiffnessMatrix(world, ecList):
     rows = []
     data = []
     for TInd in range(NtCoarse):
-        ecT = ecList[TInd]
-        assert(ecT.csi is not None)
+        Kij = KijT[TInd]
 
         NPatchCoarse = ecT.NPatchCoarse
 
         colsT = TpStartIndices[TInd] + TpIndexMap
         rowsT = TpStartIndices[TInd] + TpIndexMap
-        dataT = ecT.csi.Kij.flatten()
+        dataT = Kij.flatten()
 
         cols.extend(np.tile(colsT, np.size(rowsT)))
         rows.extend(np.repeat(rowsT, np.size(colsT)))
