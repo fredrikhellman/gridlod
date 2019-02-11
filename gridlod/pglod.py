@@ -46,7 +46,7 @@ def assembleBasisCorrectors(world, patchT, basisCorrectorsListT):
 
     return basisCorrectors
         
-def assembleMsStiffnessMatrix(world, KmsijT):
+def assembleMsStiffnessMatrix(world, patchT, KmsijT):
     '''Compute the multiscale Petrov-Galerking stiffness matrix given
     Kmsij for each coarse element.
 
@@ -64,11 +64,12 @@ def assembleMsStiffnessMatrix(world, KmsijT):
     data = []
     for TInd in range(NtCoarse):
         Kmsij = KmsijT[TInd]
-
-        NPatchCoarse = ecT.NPatchCoarse
+        patch = patchT[TInd]
+        
+        NPatchCoarse = patch.NPatchCoarse
 
         patchpIndexMap = util.lowerLeftpIndexMap(NPatchCoarse, NWorldCoarse)
-        patchpStartIndex = util.convertpCoordIndexToLinearIndex(NWorldCoarse, ecT.iPatchWorldCoarse)
+        patchpStartIndex = util.convertpCoordIndexToLinearIndex(NWorldCoarse, patch.iPatchWorldCoarse)
 
         colsT = TpStartIndices[TInd] + TpIndexMap
         rowsT = patchpStartIndex + patchpIndexMap
