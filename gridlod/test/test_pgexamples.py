@@ -43,7 +43,7 @@ class exampleProblem_TestCase(unittest.TestCase):
                 for TInd in range(world.NtCoarse):
                     patch = Patch(world, k, TInd)
                     IPatch = lambda: interp.L2ProjectionPatchMatrix(patch.iPatchWorldCoarse, patch.NPatchCoarse, NWorldCoarse, NCoarseElement, boundaryConditions)
-                    aPatch = lambda: coef.CoefficientFine(NWorldCoarse, NCoarseElement, aFine).localize(patch.iPatchWorldCoarse, patch.NPatchCoarse).aFine
+                    aPatch = lambda: coef.localizeCoefficient(patch, aFine)
 
                     correctorsList = lod.computeBasisCorrectors(patch, IPatch, aPatch)
                     csi = lod.computeCoarseQuantities(patch, correctorsList, aPatch)
