@@ -128,10 +128,7 @@ class corrector_TestCase(unittest.TestCase):
             pc = util.pCoordinates(world.NWorldFine)
             x1 = pc[:,0]
             x2 = pc[:,1]
-            return [x1, x1]
-
-        # Mock corrector Q = functions
-        correctorsList = computeFunctions()
+            return [x1]
 
         elementFinepIndexMap = util.extractElementFine(NWorldCoarse,
                                                        NCoarseElement,
@@ -141,15 +138,31 @@ class corrector_TestCase(unittest.TestCase):
                                                        NCoarseElement,
                                                        0*NCoarseElement,
                                                        extractElements=True)
-
-        # Let lambdas = functions too
+        # Let lambdas = functions
         lambdasList = [f[elementFinepIndexMap] for f in computeFunctions()]
 
+        ## Case
+        # aPatch = 1
+        # Let corrector Q = functions
+        # Expect: muTPrime for first element T is 0, the others 1
+        correctorsList = computeFunctions()
         aPatch = np.ones(world.NpFine)
-        
         csi = lod.computeCoarseQuantities(patch, lambdasList, correctorsList, aPatch)
 
         self.assertAlmostEqual(np.sum(csi.muTPrime), 6*5*4-1)
+        self.assertAlmostEqual(csi.muTPrime[0], 0)
+        
+        ## Case
+        # aPatch = 1
+        # Let corrector Q = 2*functions
+        # Expect: muTPrime is 1 for first element and 4 for all others
+        correctorsList = [2*f for f in computeFunctions()]
+        aPatch = np.ones(world.NpFine)
+        csi = lod.computeCoarseQuantities(patch, lambdasList, correctorsList, aPatch)
+
+        self.assertAlmostEqual(np.sum(csi.muTPrime), 4*(6*5*4-1)+1)
+        self.assertAlmostEqual(csi.muTPrime[0], 1)
+        
         
     def test_computeSingleT(self):
         NWorldCoarse = np.array([4, 5, 6])
@@ -331,5 +344,52 @@ class errorIndicators_TestCase(unittest.TestCase):
         self.assertAlmostEqual(lod.computeErrorIndicatorFine(patch, lambdasList, correctorsList, aOld, aNew),
                                0.1*np.sqrt(11*(10-1)**2/10**2))
 
+    def test_computeErrorIndicatorCoarseFromCoefficients(self):
+        ## Setup
+        # 2D, variables x0 and x1
+        NCoarse = np.array([4, 3])
+        NCoarseElement = np.array([2, 3])
+        world = World(NCoarse, NCoarseElement)
+        patch = Patch(world, 4, 0)
+        NFine = NCoarse*NCoarseElement
+        NtCoarse = world.NtCoarse
+        
+        # muTPrime = 1, ..., NtCoarse
+        muTPrime = np.arange(NtCoarse) + 1
+
+        ## Case
+        # aOld = aNew = 1
+        # Expect: 0 error indicator
+        aOld = np.ones(world.NtFine, dtype=np.float64)
+        aNew = aOld
+        
+        self.assertAlmostEqual(lod.computeErrorIndicatorCoarseFromCoefficients(patch, muTPrime, aOld, aNew), 0)
+
+        ## Case
+        # aOld = 1
+        # aNew = 10
+        # Expect: sqrt(1/10 * 1/10*(10-1)**2*1 * (NtCoarse)*(NtCoarse+1)/2)
+        aOld = np.ones(world.NtFine, dtype=np.float64)
+        aNew = 10*aOld
+        
+        self.assertAlmostEqual(lod.computeErrorIndicatorCoarseFromCoefficients(patch, muTPrime, aOld, aNew),
+                               np.sqrt(1/10 * 1/10*(10-1)**2*1 * (NtCoarse)*(NtCoarse+1)/2))
+        
+        ## Case
+        # aOld = 1
+        # aNew = 1 except in TInd=2 (where muTPrime == 3), where it is 10
+        # Expect: sqrt(1 * 1/10*(10-1)**2*1 * 3)
+        aOld = np.ones(world.NtFine, dtype=np.float64)
+        aNew = np.ones(world.NtFine, dtype=np.float64)
+        
+        elementFinetIndexMap = util.extractElementFine(NCoarse,
+                                                       NCoarseElement,
+                                                       np.array([2, 0]),
+                                                       extractElements=True)
+        aNew[elementFinetIndexMap] = 10
+        
+        self.assertAlmostEqual(lod.computeErrorIndicatorCoarseFromCoefficients(patch, muTPrime, aOld, aNew),
+                               np.sqrt(1 * 1/10*(10-1)**2*1 * 3))
+    
 if __name__ == '__main__':
     unittest.main()

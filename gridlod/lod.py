@@ -278,20 +278,25 @@ def computeBasisErrorIndicatorFine(patch, correctorsList, aPatchOld, aPatchNew):
     return computeBasisErrorIndicatorFine(patch, lambdasList, correctorsList, aPatchOld, aPatchNew)
 
 def computeErrorIndicatorCoarseFromGreeks(patch, muTPrime, greeksPatch):
-    ''' Compute the coarse error idicator E(T) from the "greeks" kappa and delta,
+    '''Compute the coarse error idicator E(T) from the "greeks" delta and kappa,
     where
 
-    kappaMaxT = || AOld ANew^{-1} ||_max(T)
-                                 over the patch coarse T (patch.iPatchWorldCoarse)
-
-    deltaMaxTPrime = || ANew^{-1/2} (ANew - AOld) AOld^{1/2} ||_max(TPrime)
+    deltaMaxTPrime = || ANew^{-1/2} (ANew - AOld) AOld^{-1/2} ||_max(TPrime)
                                                      over all coarse elements TPrime in the patch
+
+    kappaMaxT = || AOld^{1/2) ANew^{-1/2} ||_max(T)
+                                 over the patch coarse T (patch.iPatchWorldCoarse)
 
     This requires muTPrime from CSI and the new and old coefficient.
 
     greeksPatch should either be
       1. callable and returns (kappaMaxT, deltaMaxTPrime)
       2. the tuple (kappaMaxT, deltaMaxTPrime)
+
+    This function is convenient if the greeks can be computed without
+    the need of AOld or ANew, for example from the Jacobian in the
+    domain mapping case.
+
     '''
 
     while callable(greeksPatch):
@@ -299,8 +304,7 @@ def computeErrorIndicatorCoarseFromGreeks(patch, muTPrime, greeksPatch):
 
     deltaMaxTPrime, kappaMaxT = greeksPatch
 
-    epsilonTSquare = kappaMaxT * \
-                     np.sum((deltaMaxNormTPrime**2)*muTPrime)
+    epsilonTSquare = kappaMaxT**2 * np.sum((deltaMaxTPrime**2)*muTPrime)
 
     return np.sqrt(epsilonTSquare)
 
@@ -339,10 +343,10 @@ def computeErrorIndicatorCoarseFromCoefficients(patch, muTPrime, aPatchOld, aPat
     aTPrime = aNew[TPrimeIndices]
     aOldTPrime = aOld[TPrimeIndices]
 
-    deltaMaxNormTPrime = np.max(np.abs((aTPrime - aOldTPrime)/np.sqrt(aTPrime*aOldTPrime)), axis=1)
-    kappaMaxT = np.max(np.abs(aTPrime[elementCoarseIndex]/aOldTPrime[elementCoarseIndex]))
+    deltaMaxTPrime = np.max(np.abs((aTPrime - aOldTPrime)/np.sqrt(aTPrime*aOldTPrime)), axis=1)
+    kappaMaxT = np.sqrt(np.max(np.abs(aOldTPrime[elementCoarseIndex]/aTPrime[elementCoarseIndex])))
 
-    return computeErrorIndicatorCoarseFromGreeks(patch, muTPrime, (kappaMaxT, deltaMaxNormTPrime))
+    return computeErrorIndicatorCoarseFromGreeks(patch, muTPrime, (deltaMaxTPrime, kappaMaxT))
 
 def computeCoarseQuantities(patch, lambdasList, correctorsList, aPatch):
     '''Compute coarse quantities for pairs of lambdas and correctors
