@@ -14,12 +14,16 @@ def nodalCoarseElementMatrix(NCoarseElement):
     I = sparse.coo_matrix((np.ones_like(rows), (rows, ind)), shape=(NpCoarse, NpFine))
     return I
 
-def nodalPatchMatrix(iPatchCoarse, NPatchCoarse, NWorldCoarse, NCoarseElement):
-    NPatchFine = NPatchCoarse*NCoarseElement
+def nodalPatchMatrix(patch):
+    NPatchFine = patch.NPatchFine
+    NPatchCoarse = patch.NPatchCoarse
+    NCoarseElement = patch.world.NCoarseElement
+    iPatchWorldCoarse = patch.iPatchWorldCoarse
+    NWorldCoarse = patch.world.NWorldCoarse
     
     IElement = nodalCoarseElementMatrix(NCoarseElement)
     IPatch = assemblePatchInterpolationMatrix(IElement, NPatchFine, NCoarseElement)
-    AvgPatch = assemblePatchNodeAveragingMatrix(iPatchCoarse, NPatchCoarse, NWorldCoarse)
+    AvgPatch = assemblePatchNodeAveragingMatrix(iPatchWorldCoarse, NPatchCoarse, NWorldCoarse)
     INodalPatch = AvgPatch*IPatch
     return INodalPatch
     
@@ -38,15 +42,19 @@ def L2ProjectionCoarseElementMatrix(NCoarseElement):
     I = sparse.coo_matrix(IDense)
     return I
 
-def L2ProjectionPatchMatrix(iPatchCoarse, NPatchCoarse, NWorldCoarse, NCoarseElement, boundaryConditions=None):
-    NPatchFine = NPatchCoarse*NCoarseElement
+def L2ProjectionPatchMatrix(patch, boundaryConditions=None):
+    NPatchFine = patch.NPatchFine
+    NPatchCoarse = patch.NPatchCoarse
+    NCoarseElement = patch.world.NCoarseElement
+    iPatchWorldCoarse = patch.iPatchWorldCoarse
+    NWorldCoarse =patch.world.NWorldCoarse
     
     IElement = L2ProjectionCoarseElementMatrix(NCoarseElement)
     IPatch = assemblePatchInterpolationMatrix(IElement, NPatchFine, NCoarseElement)
-    AvgPatch = assemblePatchNodeAveragingMatrix(iPatchCoarse, NPatchCoarse, NWorldCoarse)
+    AvgPatch = assemblePatchNodeAveragingMatrix(iPatchWorldCoarse, NPatchCoarse, NWorldCoarse)
     IL2ProjectionPatch = AvgPatch*IPatch
     if boundaryConditions is not None:
-        BcPatch = assemblePatchBoundaryConditionMatrix(iPatchCoarse, NPatchCoarse, NWorldCoarse, boundaryConditions)
+        BcPatch = assemblePatchBoundaryConditionMatrix(iPatchWorldCoarse, NPatchCoarse, NWorldCoarse, boundaryConditions)
         IL2ProjectionPatch = BcPatch*IL2ProjectionPatch
         
     return IL2ProjectionPatch
@@ -94,12 +102,16 @@ def uncoupledL2ProjectionCoarseElementMatrix(NCoarseElement):
         
     return I
 
-def uncoupledL2ProjectionPatchMatrix(iPatchCoarse, NPatchCoarse, NWorldCoarse, NCoarseElement):
-    NPatchFine = NPatchCoarse*NCoarseElement
+def uncoupledL2ProjectionPatchMatrix(patch):
+    NPatchFine = patch.NPatchFine
+    NPatchCoarse = patch.NPatchCoarse
+    NCoarseElement = patch.world.NCoarseElement
+    iPatchWorldCoarse = patch.iPatchWorldCoarse
+    NWorldCoarse =patch.world.NWorldCoarse
     
     IElement = uncoupledL2ProjectionCoarseElementMatrix(NCoarseElement)
     IPatch = assemblePatchInterpolationMatrix(IElement, NPatchFine, NCoarseElement)
-    AvgPatch = assemblePatchNodeAveragingMatrix(iPatchCoarse, NPatchCoarse, NWorldCoarse)
+    AvgPatch = assemblePatchNodeAveragingMatrix(iPatchWorldCoarse, NPatchCoarse, NWorldCoarse)
     IuncoupledL2ProjectionPatch = AvgPatch*IPatch
     return IuncoupledL2ProjectionPatch
 
@@ -132,12 +144,12 @@ def assemblePatchInterpolationMatrix(IElement, NPatchFine, NCoarseElement):
     
     return I
 
-def assemblePatchNodeAveragingMatrix(iPatchCoarse, NPatchCoarse, NWorldCoarse):
+def assemblePatchNodeAveragingMatrix(iPatchWorldCoarse, NPatchCoarse, NWorldCoarse):
     Np = np.prod(NPatchCoarse+1)
-    numNeighbors = util.numNeighboringElements(iPatchCoarse, NPatchCoarse, NWorldCoarse)
+    numNeighbors = util.numNeighboringElements(iPatchWorldCoarse, NPatchCoarse, NWorldCoarse)
     return sparse.dia_matrix((1./numNeighbors, 0), shape=(Np, Np))
     
-def assemblePatchBoundaryConditionMatrix(iPatchCoarse, NPatchCoarse, NWorldCoarse, boundaryConditions):
+def assemblePatchBoundaryConditionMatrix(iPatchWorldCoarse, NPatchCoarse, NWorldCoarse, boundaryConditions):
     Np = np.prod(NPatchCoarse+1)
     d = np.size(NPatchCoarse)
     
@@ -148,8 +160,8 @@ def assemblePatchBoundaryConditionMatrix(iPatchCoarse, NPatchCoarse, NWorldCoars
     # faces, all DoFs free.
     boundaryMapWorld = boundaryConditions==0
 
-    inherit0 = iPatchCoarse==0
-    inherit1 = (iPatchCoarse+NPatchCoarse)==NWorldCoarse
+    inherit0 = iPatchWorldCoarse==0
+    inherit1 = (iPatchWorldCoarse+NPatchCoarse)==NWorldCoarse
     
     boundaryMap = np.zeros([d, 2], dtype='bool')
     boundaryMap[inherit0,0] = boundaryMapWorld[inherit0,0]

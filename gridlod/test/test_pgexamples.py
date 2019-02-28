@@ -42,7 +42,7 @@ class exampleProblem_TestCase(unittest.TestCase):
 
                 def computeKmsij(TInd):
                     patch = Patch(world, k, TInd)
-                    IPatch = lambda: interp.L2ProjectionPatchMatrix(patch.iPatchWorldCoarse, patch.NPatchCoarse, NWorldCoarse, NCoarseElement, boundaryConditions)
+                    IPatch = lambda: interp.L2ProjectionPatchMatrix(patch, boundaryConditions)
                     aPatch = lambda: coef.localizeCoefficient(patch, aFine)
 
                     correctorsList = lod.computeBasisCorrectors(patch, IPatch, aPatch)

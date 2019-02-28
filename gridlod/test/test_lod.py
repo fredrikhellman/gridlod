@@ -24,9 +24,9 @@ class ritzProjectionToFinePatch_TestCase(unittest.TestCase):
 
         PPatch = fem.assembleProlongationMatrix(NPatchCoarse, NCoarseElement)
 
-        IPatchNodal = interp.nodalPatchMatrix(np.array([0, 0]), NPatchCoarse, NPatchCoarse, NCoarseElement)
+        IPatchNodal = interp.nodalPatchMatrix(patch)
         #IPatchuncL2 = interp.uncoupledL2ProjectionPatchMatrix(np.array([0, 0]), NPatchCoarse, NPatchCoarse, NCoarseElement)
-        IPatchL2 = interp.L2ProjectionPatchMatrix(np.array([0, 0]), NPatchCoarse, NPatchCoarse, NCoarseElement)
+        IPatchL2 = interp.L2ProjectionPatchMatrix(patch)
 
         for IPatch in [IPatchNodal, IPatchL2]:
             np.random.seed(0)
@@ -81,7 +81,7 @@ class corrector_TestCase(unittest.TestCase):
         TInd = util.convertpCoordIndexToLinearIndex(NWorldCoarse, iElementWorldCoarse)
         patch = Patch(world, k, TInd)
         
-        IPatch = interp.L2ProjectionPatchMatrix(patch.iPatchWorldCoarse, patch.NPatchCoarse, NWorldCoarse, NCoarseElement)
+        IPatch = interp.L2ProjectionPatchMatrix(patch)
         
         NtPatch = patch.NtFine
         np.random.seed(1)
@@ -126,7 +126,7 @@ class corrector_TestCase(unittest.TestCase):
         TInd = util.convertpCoordIndexToLinearIndex(NWorldCoarse, iElementWorldCoarse)
         patch = Patch(world, k, TInd)
 
-        IPatch = interp.L2ProjectionPatchMatrix(patch.iPatchWorldCoarse, patch.NPatchCoarse, NWorldCoarse, NCoarseElement)
+        IPatch = interp.L2ProjectionPatchMatrix(patch)
         
         NtPatch = patch.NtFine
 
@@ -161,9 +161,9 @@ class corrector_TestCase(unittest.TestCase):
 
         world = World(NWorldCoarse, NCoarseElement)
         d = np.size(NWorldCoarse)
-        IWorld = interp.nodalPatchMatrix(0*NWorldCoarse, NWorldCoarse, NWorldCoarse, NCoarseElement)
-        aWorld = np.exp(np.random.rand(world.NtFine))
         k = np.max(NWorldCoarse)
+        IWorld = interp.nodalPatchMatrix(Patch(world, k, 0))
+        aWorld = np.exp(np.random.rand(world.NtFine))
 
         elementpIndexMap = util.lowerLeftpIndexMap(np.ones_like(NWorldCoarse), NWorldCoarse)
         elementpIndexMapFine = util.lowerLeftpIndexMap(NCoarseElement, NWorldFine)
@@ -221,8 +221,8 @@ class corrector_TestCase(unittest.TestCase):
 
         fixed = util.boundarypIndexMap(NPatchFine)
         
-        for IPatch in [interp.L2ProjectionPatchMatrix(0*NPatchCoarse, NPatchCoarse, NPatchCoarse, NCoarseElement),
-                       interp.nodalPatchMatrix(0*NPatchCoarse, NPatchCoarse, NPatchCoarse, NCoarseElement)]:
+        for IPatch in [interp.L2ProjectionPatchMatrix(patch),
+                       interp.nodalPatchMatrix(patch)]:
 
             schurComplementSolver = lod.SchurComplementSolver()
             schurComplementSolution = lod.ritzProjectionToFinePatch(patch,
