@@ -67,10 +67,8 @@ class ritzProjectionToFinePatch_TestCase(unittest.TestCase):
                                                            IPatch, saddleSolver)[0]
                 self.assertTrue(np.isclose(np.max(np.abs(projectionCheckAgainst-projection)), 0))
 
-            
-        
 class corrector_TestCase(unittest.TestCase):
-    def test_testCsi(self):
+    def test_testCsi_Kmsij(self):
         NWorldCoarse = np.array([4, 5, 6])
         NCoarseElement = np.array([5, 2, 3])
         world = World(NWorldCoarse, NCoarseElement)
@@ -87,7 +85,7 @@ class corrector_TestCase(unittest.TestCase):
         np.random.seed(1)
         aPatch = np.random.rand(NtPatch)
         basisCorrectorsList = lod.computeBasisCorrectors(patch, IPatch, aPatch)
-        csi = lod.computeCoarseQuantities(patch, basisCorrectorsList, aPatch)
+        csi = lod.computeBasisCoarseQuantities(patch, basisCorrectorsList, aPatch)
 
         TFinetIndexMap   = util.extractElementFine(patch.NPatchCoarse,
                                                    NCoarseElement,
@@ -113,7 +111,45 @@ class corrector_TestCase(unittest.TestCase):
         KmsijShouldBe[TCoarsepIndexMap,:] += np.dot(localBasis.T, AElementFine*localBasis)
         
         self.assertTrue(np.isclose(np.max(np.abs(csi.Kmsij-KmsijShouldBe)), 0))
+
+    def test_testCsi_muTPrime(self):
+        # 3D world
+        NWorldCoarse = np.array([6, 5, 4])
+        NCoarseElement = np.array([5, 2, 3])
+        world = World(NWorldCoarse, NCoarseElement)
+
+        # Full patch
+        TInd = 0
+        k = 6
+        patch = Patch(world, k, TInd)
+
+        # Let functions = [x1]
+        def computeFunctions():
+            pc = util.pCoordinates(world.NWorldFine)
+            x1 = pc[:,0]
+            x2 = pc[:,1]
+            return [x1, x1]
+
+        # Mock corrector Q = functions
+        correctorsList = computeFunctions()
+
+        elementFinepIndexMap = util.extractElementFine(NWorldCoarse,
+                                                       NCoarseElement,
+                                                       0*NCoarseElement,
+                                                       extractElements=False)
+        elementFinetIndexMap = util.extractElementFine(NWorldCoarse,
+                                                       NCoarseElement,
+                                                       0*NCoarseElement,
+                                                       extractElements=True)
+
+        # Let lambdas = functions too
+        lambdasList = [f[elementFinepIndexMap] for f in computeFunctions()]
+
+        aPatch = np.ones(world.NpFine)
         
+        csi = lod.computeCoarseQuantities(patch, lambdasList, correctorsList, aPatch)
+
+        self.assertAlmostEqual(np.sum(csi.muTPrime), 6*5*4-1)
         
     def test_computeSingleT(self):
         NWorldCoarse = np.array([4, 5, 6])
@@ -136,7 +172,7 @@ class corrector_TestCase(unittest.TestCase):
         correctorSum = reduce(np.add, basisCorrectorsList)
         self.assertTrue(np.allclose(correctorSum, 0))
 
-        csi = lod.computeCoarseQuantities(patch, basisCorrectorsList, aPatch)
+        csi = lod.computeBasisCoarseQuantities(patch, basisCorrectorsList, aPatch)
         # Test that the matrices have the constants in their null space
         #self.assertTrue(np.allclose(np.sum(ec.csi.LTPrimeij, axis=1), 0))
         #self.assertTrue(np.allclose(np.sum(ec.csi.LTPrimeij, axis=2), 0))
@@ -230,6 +266,70 @@ class corrector_TestCase(unittest.TestCase):
                                                                     IPatch,
                                                                     schurComplementSolver)[0]
             self.assertTrue(np.isclose(np.max(np.abs(schurComplementSolution[fixed])), 0))
+
+class errorIndicators_TestCase(unittest.TestCase):
+    def test_computeErrorIndicatorFine_zeroT(self):
+        ## Setup
+        # 2D, variables x0 and x1
+        NCoarse = np.array([4, 3])
+        NCoarseElement = np.array([2, 3])
+        world = World(NCoarse, NCoarseElement)
+        patch = Patch(world, 4, 0)
+        NFine = NCoarse*NCoarseElement
+
+        # Let functions = [x1, 2*x2]
+        def computeFunctions():
+            pc = util.pCoordinates(NFine)
+            x1 = pc[:,0]
+            x2 = pc[:,1]
+            return [x1, 2*x2]
+
+        # Mock corrector Q = functions
+        correctorsList = computeFunctions()
+
+        elementFinepIndexMap = util.extractElementFine(NCoarse,
+                                                       NCoarseElement,
+                                                       0*NCoarseElement,
+                                                       extractElements=False)
+        elementFinetIndexMap = util.extractElementFine(NCoarse,
+                                                       NCoarseElement,
+                                                       0*NCoarseElement,
+                                                       extractElements=True)
+
+        # Let lambdas = functions too
+        lambdasList = [f[elementFinepIndexMap] for f in computeFunctions()]
+        
+        ## Case
+        # AOld = ANew = scalar 1
+        # Expect: Error indicator should be zero
+
+        aOld = np.ones(world.NtFine, dtype=np.float64)
+        aNew = aOld
+        
+        self.assertEqual(lod.computeErrorIndicatorFine(patch, lambdasList, correctorsList, aOld, aNew), 0)
+       
+        ## Case
+        # AOld = scalar 1
+        # ANew = scalar 10
+        # Expect: Error indicator is sqrt of integral over 11 elements with value (10-1)**2/10**2
+
+        aOld = np.ones(world.NtFine, dtype=np.float64)
+        aNew = 10*aOld
+
+        self.assertAlmostEqual(lod.computeErrorIndicatorFine(patch, lambdasList, correctorsList, aOld, aNew),
+                               np.sqrt(11*(10-1)**2/10**2))
+       
+        ## Case
+        # AOld = scalar 1
+        # ANew = scalar 10 except in T where ANew = 1000
+        # Expect: Error indicator is like in previous case, but /10
+
+        aOld = np.ones(world.NtFine, dtype=np.float64)
+        aNew = 10*aOld
+        aNew[elementFinetIndexMap] = 1000
+
+        self.assertAlmostEqual(lod.computeErrorIndicatorFine(patch, lambdasList, correctorsList, aOld, aNew),
+                               0.1*np.sqrt(11*(10-1)**2/10**2))
 
 if __name__ == '__main__':
     unittest.main()

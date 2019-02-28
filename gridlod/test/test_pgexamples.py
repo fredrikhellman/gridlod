@@ -46,7 +46,7 @@ class exampleProblem_TestCase(unittest.TestCase):
                     aPatch = lambda: coef.localizeCoefficient(patch, aFine)
 
                     correctorsList = lod.computeBasisCorrectors(patch, IPatch, aPatch)
-                    csi = lod.computeCoarseQuantities(patch, correctorsList, aPatch)
+                    csi = lod.computeBasisCoarseQuantities(patch, correctorsList, aPatch)
                     return patch, correctorsList, csi.Kmsij
 
                 # Use mapper to distribute computations (mapper could be the 'map' built-in or e.g. an ipyparallel map)
