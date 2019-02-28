@@ -203,22 +203,16 @@ def computeBasisCorrectors(patch, IPatch, aPatch, saddleSolver=None):
     (A \nabla Q_T lambda_j, \nabla vf)_{U_K(T)} = (A \nabla lambda_j, \nabla vf)_{T}
     '''
 
-    while callable(IPatch):
-        IPatch = IPatch()
-
-    while callable(aPatch):
-        aPatch = aPatch()
-
     d = np.size(patch.NPatchCoarse)
     ARhsList = list(map(np.squeeze, np.hsplit(patch.world.localBasis, 2**d)))
 
     return computeElementCorrector(patch, IPatch, aPatch, ARhsList, saddleSolver=None)
 
+def computeErrorIndicatorFine(patch, ARhsList, correctorsList, aPatchOld, aPatchNew):
+    ''' Compute the fine error idicator e(T) for a general Ritz-projected 
+    function ARhs.
 
-def computeErrorIndicatorFine(patch, correctorsList, aPatchOld, aPatchNew):
-    ''' Compute the fine error idicator e(T).
-
-    This requires all correctors and the new and old coefficient.
+    This requires ARhs, its correctors and the new and old coefficient.
     '''
 
     while callable(aPatchOld):
@@ -240,7 +234,8 @@ def computeErrorIndicatorFine(patch, correctorsList, aPatchOld, aPatchNew):
         ALocFine = world.ALocFine
     else:
         ALocFine = world.ALocMatrixFine
-    P = world.localBasis
+        
+    P = np.column_stack(ARhsList)
 
     aTilde = aPatchOld
 
@@ -274,6 +269,15 @@ def computeErrorIndicatorFine(patch, correctorsList, aPatchOld, aPatchNew):
     epsilonTSquare = np.max(np.real(eigenvalues))
 
     return np.sqrt(epsilonTSquare)
+
+def computeBasisErrorIndicatorFine(patch, correctorsList, aPatchOld, aPatchNew):
+    ''' Compute the fine error idicator e(T) for a corrected basis.
+    '''
+
+    d = np.size(patch.NPatchCoarse)
+    ARhsList = list(map(np.squeeze, np.hsplit(patch.world.localBasis, 2**d)))
+
+    computeBasisErrorIndicatorFine(patch, ARhsList, correctorsList, aPatchOld, aPatchNew)
 
 def computeErrorIndicatorCoarseFromGreeks(patch, muTPrime, greeksPatch):
     ''' Compute the coarse error idicator E(T) from the "greeks" kappa and delta,
