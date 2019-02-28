@@ -7,5 +7,4 @@ setup(name='gridlod',
       author='Fredrik Hellman',
       author_email='fredrik.hellman@gmail.com',
       license='MIT',
-      packages=['gridlod', 'gridlod_ipp'],
-      zip_safe=False)
+      packages=['gridlod'])

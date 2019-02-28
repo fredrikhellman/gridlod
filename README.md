@@ -85,3 +85,8 @@ diffusion* (arXiv:1703.08857) is defined by the following files.
 
 The test and integration directories contain some tests that can be
 illustrative. Use e.g. `nosetests` to run the tests.
+
+## Contributors
+
+* Fredrik Hellman
+* Tim Keil
