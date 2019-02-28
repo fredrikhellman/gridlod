@@ -67,27 +67,26 @@ class DirectSolver:
     def solve(self, A, I, bList, fixed, NPatchCoarse=None, NCoarseElement=None):
         return linalg.saddleDirect(A, I, bList, fixed)
     
-def ritzProjectionToFinePatch(world,
-                              iPatchWorldCoarse,
-                              NPatchCoarse,
+def ritzProjectionToFinePatch(patch,
                               APatchFull,
                               bPatchFullList,
                               IPatch,
                               saddleSolver=None):
     if saddleSolver is None:
         saddleSolver = SchurComplementSolver()  # Fast for small patch problems
-    
-    d = np.size(NPatchCoarse)
-    NPatchFine = NPatchCoarse*world.NCoarseElement
-    NpFine = np.prod(NPatchFine+1)
+
+    world = patch.world
+    d = np.size(patch.NPatchCoarse)
+    NPatchFine = patch.NPatchFine
+    NpFine = patch.NpFine
 
     # Find what patch faces are common to the world faces, and inherit
     # boundary conditions from the world for those. For the other
     # faces, all DoFs fixed (Dirichlet)
     boundaryMapWorld = world.boundaryConditions==0
 
-    inherit0 = iPatchWorldCoarse==0
-    inherit1 = (iPatchWorldCoarse+NPatchCoarse)==world.NWorldCoarse
+    inherit0 = patch.iPatchWorldCoarse==0
+    inherit1 = (patch.iPatchWorldCoarse + patch.NPatchCoarse)==world.NWorldCoarse
     
     boundaryMap = np.ones([d, 2], dtype='bool')
     boundaryMap[inherit0,0] = boundaryMapWorld[inherit0,0]
@@ -101,7 +100,7 @@ def ritzProjectionToFinePatch(world,
     
     #projectionsList = saddleSolver.solve(APatch, IPatch, bPatchList)
 
-    projectionsList = saddleSolver.solve(APatchFull, IPatch, bPatchFullList, fixed, NPatchCoarse, world.NCoarseElement)
+    projectionsList = saddleSolver.solve(APatchFull, IPatch, bPatchFullList, fixed, patch.NPatchCoarse, world.NCoarseElement)
 
     return projectionsList
 
@@ -188,9 +187,7 @@ def computeElementCorrector(patch, IPatch, aPatch, ARhsList=None, MRhsList=None,
             bPatchFull[elementFinepIndexMap] += MElementFull*MRhsList[rhsIndex]
         bPatchFullList.append(bPatchFull)
 
-    correctorsList = ritzProjectionToFinePatch(world,
-                                               patch.iPatchWorldCoarse,
-                                               NPatchCoarse,
+    correctorsList = ritzProjectionToFinePatch(patch,
                                                APatchFull,
                                                bPatchFullList,
                                                IPatch,
@@ -314,9 +311,9 @@ def computeErrorIndicatorCoarseExact(patch, muTPrime, aPatchOld, aPatchNew):
     aTildeTPrime = aTilde[TPrimeIndices]
 
     deltaMaxNormTPrime = np.max(np.abs((aTPrime - aTildeTPrime)/np.sqrt(aTPrime*aTildeTPrime)), axis=1)
-    theOtherUnnamedFactorTPrime = np.max(np.abs(aTPrime[elementCoarseIndex]/aTildeTPrime[elementCoarseIndex]))
+    kappaMaxT = np.max(np.abs(aTPrime[elementCoarseIndex]/aTildeTPrime[elementCoarseIndex]))
 
-    epsilonTSquare = theOtherUnnamedFactorTPrime * \
+    epsilonTSquare = kappaMaxT * \
                      np.sum((deltaMaxNormTPrime**2)*muTPrime)
 
     return np.sqrt(epsilonTSquare)

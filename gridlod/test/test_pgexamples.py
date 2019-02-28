@@ -49,6 +49,7 @@ class exampleProblem_TestCase(unittest.TestCase):
                     csi = lod.computeCoarseQuantities(patch, correctorsList, aPatch)
                     return patch, correctorsList, csi.Kmsij
 
+                # Use mapper to distribute computations (mapper could be the 'map' built-in or e.g. an ipyparallel map)
                 patchT, correctorsListT, KmsijT = zip(*mapper(computeKmsij, range(world.NtCoarse)))
 
                 KFull = pglod.assembleMsStiffnessMatrix(world, patchT, KmsijT)
@@ -84,7 +85,7 @@ class exampleProblem_TestCase(unittest.TestCase):
         test_1d_core(map)
 
         # Although disabled in the unit test, the code below shows an example
-        # of how to an ipyparallel cluster to compute the correctors.
+        # of how to use an ipyparallel cluster to compute the correctors.
         if False:
             import ipyparallel as ipp
             client = ipp.Client()

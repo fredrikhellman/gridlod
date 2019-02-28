@@ -133,3 +133,9 @@ def solve(world, KmsFull, bFull, boundaryConditions):
     uFull[free] = uFree
 
     return uFull, uFree
+
+# The computeFaceFluxTF function has been temporarily removed since
+# there were no tests for it.  Readd if needed. Find it in git
+# history.
+
+#def computeFaceFluxTF(self, u, f=None):
