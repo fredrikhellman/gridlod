@@ -275,7 +275,7 @@ def computeBasisErrorIndicatorFine(patch, correctorsList, aPatchOld, aPatchNew):
 
     lambdasList = list(patch.world.localBasis.T)
 
-    return computeBasisErrorIndicatorFine(patch, lambdasList, correctorsList, aPatchOld, aPatchNew)
+    return computeErrorIndicatorFine(patch, lambdasList, correctorsList, aPatchOld, aPatchNew)
 
 def computeErrorIndicatorCoarseFromGreeks(patch, muTPrime, greeksPatch):
     '''Compute the coarse error idicator E(T) from the "greeks" delta and kappa,
