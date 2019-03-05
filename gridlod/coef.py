@@ -12,7 +12,8 @@ def localizeCoefficient(patch, aFine):
     
     # a
     coarsetIndexMap = util.lowerLeftpIndexMap(NPatchFine-1, NWorldFine-1)
-    coarsetStartIndex = util.convertpCoordIndexToLinearIndex(NPatchFine-1, iPatchWorldFine)
+    coarsetStartIndex = util.convertpCoordIndexToLinearIndex(NWorldFine-1, iPatchWorldFine)
     aFineLocalized = aFine[coarsetStartIndex + coarsetIndexMap]
-    
     return aFineLocalized
+
+
