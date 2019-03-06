@@ -362,7 +362,13 @@ class errorIndicators_TestCase(unittest.TestCase):
         # Expect: 0 error indicator
         aOld = np.ones(world.NtFine, dtype=np.float64)
         aNew = aOld
-        
+
+        self.assertAlmostEqual(lod.computeErrorIndicatorCoarseFromCoefficients(patch, muTPrime, aOld, aNew), 0)
+
+        #### Same test for Matrix valued ####
+        Aeye = np.tile(np.eye(2), [np.prod(NFine), 1, 1])
+        aNew = np.einsum('tji, t -> tji', Aeye, aNew)
+
         self.assertAlmostEqual(lod.computeErrorIndicatorCoarseFromCoefficients(patch, muTPrime, aOld, aNew), 0)
 
         ## Case
@@ -371,7 +377,14 @@ class errorIndicators_TestCase(unittest.TestCase):
         # Expect: sqrt(1/10 * 1/10*(10-1)**2*1 * (NtCoarse)*(NtCoarse+1)/2)
         aOld = np.ones(world.NtFine, dtype=np.float64)
         aNew = 10*aOld
-        
+
+        self.assertAlmostEqual(lod.computeErrorIndicatorCoarseFromCoefficients(patch, muTPrime, aOld, aNew),
+                               np.sqrt(1/10 * 1/10*(10-1)**2*1 * (NtCoarse)*(NtCoarse+1)/2))
+
+        #### Same test for Matrix valued ####
+        aNew = np.einsum('tji, t -> tji', Aeye, aNew)
+        aOld = np.einsum('tji, t-> tji', Aeye, aOld)
+
         self.assertAlmostEqual(lod.computeErrorIndicatorCoarseFromCoefficients(patch, muTPrime, aOld, aNew),
                                np.sqrt(1/10 * 1/10*(10-1)**2*1 * (NtCoarse)*(NtCoarse+1)/2))
         
@@ -387,9 +400,15 @@ class errorIndicators_TestCase(unittest.TestCase):
                                                        np.array([2, 0]),
                                                        extractElements=True)
         aNew[elementFinetIndexMap] = 10
-        
+
         self.assertAlmostEqual(lod.computeErrorIndicatorCoarseFromCoefficients(patch, muTPrime, aOld, aNew),
                                np.sqrt(1 * 1/10*(10-1)**2*1 * 3))
-    
+
+        #### Same test for Matrix valued ####
+        aOld = np.einsum('tji, t-> tji', Aeye, aOld)
+
+        self.assertAlmostEqual(lod.computeErrorIndicatorCoarseFromCoefficients(patch, muTPrime, aOld, aNew),
+                               np.sqrt(1 * 1/10*(10-1)**2*1 * 3))
+
 if __name__ == '__main__':
     unittest.main()
