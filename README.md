@@ -16,25 +16,24 @@ usage.
 ## Required packages
 
 These packages might be needed:
-* `PyEVTK`
 * `scikit-sparse`
 * `numpy`
 * `scipy`
 
 ## Getting started
 You can find some examples on how to use it in the test directory
-`test`. See e.g. `gridlod/test/test_pg.py` or
-`gridlod/integrations/test_pgtransport.py`. Especially, I think the
-example `test_1d()` in `test_pg.py` is illustrative. The example
-is taken from Daniel Peterseim's paper, *Variational Multiscale
-Stabilization and the Exponential Decay of Correctors*.
+`test`. See e.g. the example in `gridlod/test/test_pgexamples.py`. The
+example is taken from Daniel Peterseim's paper, *Variational
+Multiscale Stabilization and the Exponential Decay of Correctors*.
 
 ## Basic terminology
 The code has been developed in stages, and the terminology is not
 consistent. A few pointers follow.
 
 * `world` means the unit hypercube in question.
-* `patch` means a subdomain that is also a hypercube.
+* `patch` means a subdomain that is also a hypercube but where one
+  particular element is special (typically the center element of the
+  patch for corrector problems).
 
 Hypercubes are described by arrays. E.g. `NPatch = np.array([5,2,6])`
 is a 5 times 2 time 6 element hypercube.
@@ -68,18 +67,15 @@ of many routines is `pIndexMap`.
 The base consists of these files:
 * `fem.py` contains code for the assembly of finite element matrices.
 * `interp.py` contains code for interpolation operators.
-* `world.py` contains the world class.
-* `coef.py` contains code for defining a coefficient.
+* `world.py` contains the World and Patch class.
+* `coef.py` contains code for localizing a coefficient.
 * `femsolver.py` contains code for solving a reference FEM problem.
 * `linalg.py` contains code for solving linear systems.
 * `util.py` contains code for manipulating grid indices.
-* `lod.py` contains code for solving the LOD patch problems.
-* `transport.py` contains code for computing fluxes.
-
-The application in *Numerical homogenization of time-dependent
-diffusion* (arXiv:1703.08857) is defined by the following files.
-* `pg.py` contains code for the main algorithm in that paper.
-* `ecworker.py` and `eccontroller.py` contains a hack that parallelizes computations over an ipyparallel cluster.
+* `lod.py` contains code for solving corrector problems.
+* `pglod.py` contains code for assembling PG-LOD matrices
+* `func.py` contains code for describing Q0 and Q1 functions.
+* `transport.py` contains code for computing fluxes (not well-maintained)
 
 ## Tests
 
