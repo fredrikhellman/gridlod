@@ -225,10 +225,6 @@ def computeErrorIndicatorFine(patch, lambdasList, correctorsList, aPatchOld, aPa
     NCoarseElement = world.NCoarseElement
     NPatchFine = NPatchCoarse*NCoarseElement
 
-    # if aPatchNew.ndim == 3 and aPatchOld.ndim == 1:
-    #     Aeye = np.tile(np.eye(2), [patch.NpFine, 1, 1])
-    #     aPatchOld = np.einsum('tji, t, tkj -> tik', Aeye, aPatchOld, Aeye)
-
     a = aPatchNew
 
     assert(a.ndim == 1 or a.ndim == 3)
@@ -338,11 +334,11 @@ def computeErrorIndicatorCoarseFromCoefficients(patch, muTPrime, aPatchOld, aPat
 
     ### In case aNew and aOld dimensions do not match ###
     if aNew.ndim == 3 and aOld.ndim ==1:
-        Aeye = np.tile(np.eye(2), [np.prod(NPatchFine), 1, 1])
-        aOld = np.einsum('tji, t-> tji', Aeye, aOld)
+        aEye = np.tile(np.eye(2), [np.prod(NPatchFine), 1, 1])
+        aOld = np.einsum('tji, t-> tji', aEye, aOld)
     if aNew.ndim == 1 and aOld.ndim ==3:
-        Aeye = np.tile(np.eye(2), [np.prod(NPatchFine), 1, 1])
-        aNew = np.einsum('tji, t -> tji', Aeye, aNew)
+        aEye = np.tile(np.eye(2), [np.prod(NPatchFine), 1, 1])
+        aNew = np.einsum('tji, t -> tji', aEye, aNew)
 
 
     elementCoarseIndex = util.convertpCoordIndexToLinearIndex(NPatchCoarse-1, iElementPatchCoarse)
@@ -355,19 +351,16 @@ def computeErrorIndicatorCoarseFromCoefficients(patch, muTPrime, aPatchOld, aPat
     aOldTPrime = aOld[TPrimeIndices]
 
     if aNew.ndim == 3:
-        deltaMaxTPrime = np.zeros(np.shape(TPrimeIndices)[0])
-        deltaTPrime = []
-        i = 0
-        for Tindizes in TPrimeIndices:
-            for T in Tindizes:
-                sqrt1 = scipy.linalg.sqrtm(np.linalg.inv(aNew[T]))
-                sqrt2 = scipy.linalg.sqrtm(np.linalg.inv(aOld[T]))
-                deltaTPrime.append(np.max(np.abs(np.dot(np.dot(sqrt1, (aNew[T] - aOld[T])), sqrt2))))
-            deltaMaxTPrime[i] = np.max(deltaTPrime)
-            deltaTPrime = []
-            i += 1
-        kappaMaxT = np.sqrt(np.max(np.abs(aOldTPrime[elementCoarseIndex]*
-                                          np.linalg.inv(aTPrime[elementCoarseIndex]))))
+        aInvTPrime = np.linalg.inv(aTPrime)
+        aOldInvTPrime = np.linalg.inv(aOldTPrime)
+        aDiffTPrime = aTPrime - aOldTPrime
+        deltaMaxTPrime = np.sqrt(np.max(np.linalg.norm(np.einsum('Ttij, Ttjk, Ttkl, Ttlm -> Ttim',
+                                                                 aInvTPrime, aDiffTPrime, aDiffTPrime, aOldInvTPrime),
+                                                       axis=(2,3), ord=2),
+                                        axis=1))
+        kappaMaxT = np.sqrt(np.max(np.linalg.norm(np.einsum('tij, tjk -> tik',
+                                                            aOldTPrime[elementCoarseIndex], aInvTPrime[elementCoarseIndex]),
+                                                  axis=(1,2), ord=2)))
     else:
         deltaMaxTPrime = np.max(np.abs((aTPrime - aOldTPrime)/np.sqrt(aTPrime*aOldTPrime)), axis=1)
         kappaMaxT = np.sqrt(np.max(np.abs(aOldTPrime[elementCoarseIndex] / aTPrime[elementCoarseIndex])))
