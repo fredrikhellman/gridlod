@@ -463,11 +463,10 @@ def computeCoarseQuantities(patch, lambdasList, correctorsList, aPatch):
                 Kmsij[sigma,:] += -BTPrimeij
 
     muTPrime = np.zeros(NTPrime)
+    cutRows = 0
+    while np.linalg.cond(Kij[cutRows:,cutRows:]) > 1e8:
+        cutRows = cutRows + 1
     for TPrimeInd in np.arange(NTPrime):
-        cutRows = 0
-        while np.linalg.cond(Kij[cutRows:,cutRows:]) > 1e16:
-            cutRows = cutRows + 1
-            
         # Solve eigenvalue problem LTPrimeij x = mu_TPrime Mij x
         eigenvalues = scipy.linalg.eigvals(LTPrimeij[TPrimeInd][cutRows:,cutRows:], Kij[cutRows:,cutRows:])
         muTPrime[TPrimeInd] = np.max(np.real(eigenvalues))
