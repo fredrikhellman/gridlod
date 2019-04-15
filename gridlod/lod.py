@@ -367,7 +367,7 @@ def computeErrorIndicatorCoarseFromCoefficients(patch, muTPrime, aPatchOld, aPat
 
     return computeErrorIndicatorCoarseFromGreeks(patch, muTPrime, (deltaMaxTPrime, kappaMaxT))
 
-def computeCoarseQuantities(patch, lambdasList, correctorsList, aPatch):
+def computeCoarseQuantities(patch, lambdasList, correctorsList, aPatch, rhs):
     '''Compute coarse quantities for pairs of lambdas and correctors
 
     Compute the tensors (T is implcit by the patch definition):
@@ -427,6 +427,8 @@ def computeCoarseQuantities(patch, lambdasList, correctorsList, aPatch):
 
     # This loop can probably be done faster than this. If a bottle-neck, fix!
     Kmsij = np.zeros((NpPatchCoarse, numLambdas))
+    Rmsij = np.zeros((NpPatchCoarse, numLambdas))
+
     LTPrimeij = np.zeros((NTPrime, numLambdas, numLambdas))
     for (TPrimeInd,
          TPrimeCoarsepStartIndex,
@@ -461,6 +463,7 @@ def computeCoarseQuantities(patch, lambdasList, correctorsList, aPatch):
             
             if numLambdas == 2**d:
                 Kmsij[sigma,:] += -BTPrimeij
+        Rmsij[sigma,:] += -BTPrimeij
 
     muTPrime = np.zeros(NTPrime)
     cutRows = 0
@@ -471,15 +474,18 @@ def computeCoarseQuantities(patch, lambdasList, correctorsList, aPatch):
         eigenvalues = scipy.linalg.eigvals(LTPrimeij[TPrimeInd][cutRows:,cutRows:], Kij[cutRows:,cutRows:])
         muTPrime[TPrimeInd] = np.max(np.real(eigenvalues))
 
-    return CoarseScaleInformation(Kij, Kmsij, muTPrime)
+    if rhs:
+        return CoarseScaleInformation(Kij, Rmsij, muTPrime)
+    else:
+        return CoarseScaleInformation(Kij, Kmsij, muTPrime)
 
-def computeBasisCoarseQuantities(patch, correctorsList, aPatch):
+def computeBasisCoarseQuantities(patch, correctorsList, aPatch, rhs = False):
     ''' Compute the coarse quantities for the local basis and its correctors
     '''
 
     lambdasList = list(patch.world.localBasis.T)
 
-    return computeCoarseQuantities(patch, lambdasList, correctorsList, aPatch)
+    return computeCoarseQuantities(patch, lambdasList, correctorsList, aPatch, rhs)
 
 
 def computeCoarseQuantitiesFlux(patch, correctorsList, aPatch):
