@@ -46,8 +46,49 @@ def assembleBasisCorrectors(world, patchT, basisCorrectorsListT):
 
     return basisCorrectors
         
+def assemblePatchFunction(world, patchT, funcT):
+    numPatches = len(patchT)
+    assert(numPatches == len(funcT))
+    assert(numPatches >= 1)
+
+    if funcT[0].size == patchT[0].NpCoarse:
+        NWorld = world.NWorldCoarse
+        NElement = np.ones_like(world.NCoarseElement)
+    elif funcT[0].size == patchT[0].NpFine: 
+        NWorld = world.NWorldFine
+        NElement = world.NCoarseElement
+   
+    NpWorld = np.prod(NWorld+1)
+
+    cols = []
+    rows = []
+    data = []
+    for patchInd in range(numPatches):
+        func = funcT[patchInd]
+        patch = patchT[patchInd]
+        
+        NPatch = patch.NPatchCoarse*NElement
+        iPatchWorld = patch.iPatchWorldCoarse*NElement
+
+        patchpIndexMap = util.lowerLeftpIndexMap(NPatch, NWorld)
+        patchpStartIndex = util.convertpCoordIndexToLinearIndex(NWorld, iPatchWorld)
+
+        rowsPatch = patchpStartIndex + patchpIndexMap
+        colsPatch = 0*rowsPatch
+        dataPatch = func
+
+        cols.extend(colsPatch)
+        rows.extend(rowsPatch)
+        data.extend(dataPatch)
+
+    funcFullSparse = sparse.csc_matrix((data, (rows, cols)), shape=(NpWorld, 1))
+    funcFull = np.squeeze(np.array(funcFullSparse.todense()))
+    
+    return funcFull
+    
+
 def assembleMsStiffnessMatrix(world, patchT, KmsijT):
-    '''Compute the multiscale Petrov-Galerking stiffness matrix given
+    '''Compute the multiscale Petrov-Galerkin stiffness matrix given
     Kmsij for each coarse element.
 
     '''

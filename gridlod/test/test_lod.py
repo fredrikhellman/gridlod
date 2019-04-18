@@ -111,58 +111,6 @@ class corrector_TestCase(unittest.TestCase):
         KmsijShouldBe[TCoarsepIndexMap,:] += np.dot(localBasis.T, AElementFine*localBasis)
         
         self.assertTrue(np.isclose(np.max(np.abs(csi.Kmsij-KmsijShouldBe)), 0))
-
-    def test_testCsi_muTPrime(self):
-        # 3D world
-        NWorldCoarse = np.array([6, 5, 4])
-        NCoarseElement = np.array([5, 2, 3])
-        world = World(NWorldCoarse, NCoarseElement)
-
-        # Full patch
-        TInd = 0
-        k = 6
-        patch = Patch(world, k, TInd)
-
-        # Let functions = [x1]
-        def computeFunctions():
-            pc = util.pCoordinates(world.NWorldFine)
-            x1 = pc[:,0]
-            x2 = pc[:,1]
-            return [x1]
-
-        elementFinepIndexMap = util.extractElementFine(NWorldCoarse,
-                                                       NCoarseElement,
-                                                       0*NCoarseElement,
-                                                       extractElements=False)
-        elementFinetIndexMap = util.extractElementFine(NWorldCoarse,
-                                                       NCoarseElement,
-                                                       0*NCoarseElement,
-                                                       extractElements=True)
-        # Let lambdas = functions
-        lambdasList = [f[elementFinepIndexMap] for f in computeFunctions()]
-
-        ## Case
-        # aPatch = 1
-        # Let corrector Q = functions
-        # Expect: muTPrime for first element T is 0, the others 1
-        correctorsList = computeFunctions()
-        aPatch = np.ones(world.NpFine)
-        csi = lod.computeCoarseQuantities(patch, lambdasList, correctorsList, aPatch)
-
-        self.assertAlmostEqual(np.sum(csi.muTPrime), 6*5*4-1)
-        self.assertAlmostEqual(csi.muTPrime[0], 0)
-        
-        ## Case
-        # aPatch = 1
-        # Let corrector Q = 2*functions
-        # Expect: muTPrime is 1 for first element and 4 for all others
-        correctorsList = [2*f for f in computeFunctions()]
-        aPatch = np.ones(world.NpFine)
-        csi = lod.computeCoarseQuantities(patch, lambdasList, correctorsList, aPatch)
-
-        self.assertAlmostEqual(np.sum(csi.muTPrime), 4*(6*5*4-1)+1)
-        self.assertAlmostEqual(csi.muTPrime[0], 1)
-        
         
     def test_computeSingleT(self):
         NWorldCoarse = np.array([4, 5, 6])

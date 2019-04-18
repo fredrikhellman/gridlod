@@ -367,27 +367,8 @@ def computeErrorIndicatorCoarseFromCoefficients(patch, muTPrime, aPatchOld, aPat
 
     return computeErrorIndicatorCoarseFromGreeks(patch, muTPrime, (deltaMaxTPrime, kappaMaxT))
 
-def computeCoarseQuantities(patch, lambdasList, correctorsList, aPatch, rhs):
-    '''Compute coarse quantities for pairs of lambdas and correctors
+def performTPrimeLoop(patch, lambdasList, correctorsList, aPatch, accumulate):
 
-    Compute the tensors (T is implcit by the patch definition):
-
-    KTij   = (A \nabla lambda_j, \nabla lambda_i)_{T}
-    KmsTij = (A \nabla (lambda_j - Q_T lambda_j), \nabla lambda_i)_{U_k(T)}
-    muTT'  = max_{w_H} || A (\chi_T \nabla - \nabla Q_T) w_H) ||^2_T' / || A \nabla w_H ||^2_T
-
-    and store them in the self.csi object. See
-    notes/coarse_quantities*.pdf for a description.
-
-    Auxiliary quantities are computed, but not saved, e.g.
-
-    LTT'ij = (A \nabla (chi_T - Q_T)lambda_j, \nabla (chi_T - Q_T) lambda_j)_{T'}
-    '''
-
-    # This function could probably also be generalized and made work
-    # on general functions \lambda instead of specifically the basis
-    # functions.
-    
     while callable(aPatch):
         aPatch = aPatch()
 
@@ -425,11 +406,6 @@ def computeCoarseQuantities(patch, lambdasList, correctorsList, aPatch, rhs):
 
     QPatch = np.column_stack(correctorsList)
 
-    # This loop can probably be done faster than this. If a bottle-neck, fix!
-    Kmsij = np.zeros((NpPatchCoarse, numLambdas))
-    Rmsij = np.zeros((NpPatchCoarse, numLambdas))
-
-    LTPrimeij = np.zeros((NTPrime, numLambdas, numLambdas))
     for (TPrimeInd,
          TPrimeCoarsepStartIndex,
          TPrimeFinetStartIndex,
@@ -445,26 +421,55 @@ def computeCoarseQuantities(patch, lambdasList, correctorsList, aPatch, rhs):
         Q = QPatch[TPrimeFinepStartIndex + TPrimeFinepIndexMap,:]
         BTPrimeij = np.dot(P.T, KTPrime*Q)
         CTPrimeij = np.dot(Q.T, KTPrime*Q)
-        sigma = TPrimeCoarsepStartIndex + TPrimeCoarsepIndexMap
+        TPrimei = TPrimeCoarsepStartIndex + TPrimeCoarsepIndexMap
+
+        accumulate(TPrimeInd, TPrimei, P, Q, KTPrime, BTPrimeij, CTPrimeij)
+    
+def computeBasisCoarseQuantities(patch, correctorsList, aPatch):
+    ''' Compute the coarse quantities for the basis and its correctors
+
+    Compute the tensors (T is implcit by the patch definition) and
+    return them in a CoarseScaleInformation object:
+
+       KTij   = (A \nabla lambda_j, \nabla lambda_i)_{T}
+       KmsTij = (A \nabla (lambda_j - corrector_j), \nabla lambda_i)_{U_k(T)}
+       muTT'  = max_{\alpha_j} || A \alpha_j (\chi_T \nabla lambda_j - \nabla corrector_j) ||^2_T' / || A \alpha_j \nabla lambda_j ||^2_T
+
+       Auxiliary quantities are computed, but not saved, e.g.
+         LTT'ij = (A \nabla (chi_T - Q_T)lambda_j, \nabla (chi_T - Q_T) lambda_i)_{T'}
+
+    See notes/coarse_quantities*.pdf for a description.
+    '''
+
+    lambdasList = list(patch.world.localBasis.T)
+
+    NPatchCoarse = patch.NPatchCoarse
+    NTPrime = np.prod(NPatchCoarse)
+    NpPatchCoarse = np.prod(NPatchCoarse+1)
+    numLambdas = len(lambdasList)
+
+    TInd = util.convertpCoordIndexToLinearIndex(patch.NPatchCoarse-1, patch.iElementPatchCoarse)
+    
+    Kmsij = np.zeros((NpPatchCoarse, numLambdas))
+    LTPrimeij = np.zeros((NTPrime, numLambdas, numLambdas))
+    Kij = np.zeros((numLambdas, numLambdas))
+
+    def accumulate(TPrimeInd, TPrimei, P, Q, KTPrime, BTPrimeij, CTPrimeij):
         if TPrimeInd == TInd:
-            Kij = np.dot(P.T, KTPrime*P)
+            Kij[:] = np.dot(P.T, KTPrime*P)
             LTPrimeij[TPrimeInd] = CTPrimeij \
                                    - BTPrimeij \
                                    - BTPrimeij.T \
                                    + Kij
 
-            # Fix this some other way....
-            # Kmsij is special for the basis-case
-            if numLambdas == 2**d:
-                Kmsij[sigma,:] += Kij - BTPrimeij
-
+            Kmsij[TPrimei,:] += Kij - BTPrimeij
         else:
             LTPrimeij[TPrimeInd] = CTPrimeij
-            
-            if numLambdas == 2**d:
-                Kmsij[sigma,:] += -BTPrimeij
-        Rmsij[sigma,:] += -BTPrimeij
+            Kmsij[TPrimei,:] += -BTPrimeij
 
+    performTPrimeLoop(patch, lambdasList, correctorsList, aPatch, accumulate)
+
+    
     muTPrime = np.zeros(NTPrime)
     cutRows = 0
     while np.linalg.cond(Kij[cutRows:,cutRows:]) > 1e8:
@@ -474,18 +479,29 @@ def computeCoarseQuantities(patch, lambdasList, correctorsList, aPatch, rhs):
         eigenvalues = scipy.linalg.eigvals(LTPrimeij[TPrimeInd][cutRows:,cutRows:], Kij[cutRows:,cutRows:])
         muTPrime[TPrimeInd] = np.max(np.real(eigenvalues))
 
-    if rhs:
-        return CoarseScaleInformation(Kij, Rmsij, muTPrime)
-    else:
-        return CoarseScaleInformation(Kij, Kmsij, muTPrime)
+    return CoarseScaleInformation(Kij, Kmsij, muTPrime)
 
-def computeBasisCoarseQuantities(patch, correctorsList, aPatch, rhs = False):
-    ''' Compute the coarse quantities for the local basis and its correctors
+def computeRhsCoarseQuantities(patch, corrector, aPatch):
+    ''' Compute the coarse quantities for the basis and rhs corrector(s)
+
+    Compute:
+
+       RmsTi = (A \nabla corrector, \nabla lambda_i)_{U_k(T)}
     '''
 
     lambdasList = list(patch.world.localBasis.T)
+    NpPatchCoarse = np.prod(patch.NPatchCoarse+1)
 
-    return computeCoarseQuantities(patch, lambdasList, correctorsList, aPatch, rhs)
+    TInd = util.convertpCoordIndexToLinearIndex(patch.NPatchCoarse-1, patch.iElementPatchCoarse)
+    
+    Rmsi = np.zeros(NpPatchCoarse)
+    
+    def accumulate(TPrimeInd, TPrimei, P, Q, KTPrime, BTPrimeij, CTPrimeij):
+        Rmsi[TPrimei] = BTPrimeij[:,0]
+
+    performTPrimeLoop(patch, lambdasList, [corrector], aPatch, accumulate)
+
+    return Rmsi
 
 
 def computeCoarseQuantitiesFlux(patch, correctorsList, aPatch):
