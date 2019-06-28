@@ -305,7 +305,7 @@ def computeErrorIndicatorCoarseFromGreeks(patch, muTPrime, greeksPatch):
 
     deltaMaxTPrime, kappaMaxT = greeksPatch
 
-    epsilonTSquare = kappaMaxT**2 * np.sum((deltaMaxTPrime**2)*muTPrime) # is it really kappa**2? not kappa ?
+    epsilonTSquare = kappaMaxT**2 * np.sum((deltaMaxTPrime**2)*muTPrime) # TODO: is it really kappa**2? not kappa ?
 
     return np.sqrt(epsilonTSquare)
 
@@ -329,7 +329,14 @@ def computeEftErrorIndicatorCoarseFromGreeks(etaT, cetaTPrime, greeksPatch):
 
     deltaMaxTPrime, kappaMaxT, nuT, gammaT = greeksPatch
 
-    epsilonTSquare = 2 * kappaMaxT * nuT / gammaT * etaT + 2 * kappaMaxT * np.sum((deltaMaxTPrime**2)*cetaTPrime/gammaT)
+    # check the quantities
+    # print('nu: {}, gamma: {}, eta: {}, kappa: {}'.format(nuT,gammaT,etaT,kappaMaxT))
+
+    if np.isclose(gammaT,0):
+        return 0
+    else:
+        # TODO: Check this guy carefully !
+        epsilonTSquare = 2 * kappaMaxT * nuT / gammaT * etaT + 2 * kappaMaxT * np.sum((deltaMaxTPrime**2)*cetaTPrime/gammaT)
 
     return np.sqrt(epsilonTSquare)
 
@@ -393,7 +400,7 @@ def computeErrorIndicatorCoarseFromCoefficients(patch, muTPrime, aPatchOld, aPat
 
     return computeErrorIndicatorCoarseFromGreeks(patch, muTPrime, (deltaMaxTPrime, kappaMaxT))
 
-def computeEftErrorIndicatorCoarse(patch, cetaTPrime, etaT, aPatchOld, aPatchNew, fPatchOld, fPatchNew):
+def computeEftErrorIndicatorCoarse(patch, cetaTPrime, etaT, aPatchOld, aPatchNew, fElementOld, fElementNew):
     while callable(aPatchOld):
         aPatchOld = aPatchOld()
 
@@ -442,7 +449,7 @@ def computeEftErrorIndicatorCoarse(patch, cetaTPrime, etaT, aPatchOld, aPatchNew
         deltaMaxTPrime = np.max(np.abs((aTPrime - aOldTPrime)/np.sqrt(aTPrime*aOldTPrime)), axis=1)
         kappaMaxT = np.sqrt(np.max(np.abs(aOldTPrime[elementCoarseIndex] / aTPrime[elementCoarseIndex])))
 
-    # #ATTENTION: THIS IS WRONG... I tried to compute L2 norm here
+    # #TODO: THIS IS WRONG... I tried to compute L2 norm here
 
     # P = fem.assembleProlongationMatrix(patch.NPatchCoarse, patch.world.NCoarseElement)
     # MLoc = fem.assemblePatchMatrix(patch.NPatchFine, world.MLocFine)
@@ -450,10 +457,9 @@ def computeEftErrorIndicatorCoarse(patch, cetaTPrime, etaT, aPatchOld, aPatchNew
     #             MLoc * (fPatchOld[elementCoarseIndex] - fPatchNew[elementCoarseIndex]))
     # gammaT = np.dot(fPatchNew[elementCoarseIndex], MLoc * fPatchNew[elementCoarseIndex])
 
-    # # Just taking max norm in the nodes. This is wrong !
-    CoordCoarseIndex = util.convertpLinearIndexToCoordIndex(NPatchCoarse - 1, iElementPatchCoarse)
-    nuT = np.max(np.abs(fPatchOld[CoordCoarseIndex] - fPatchNew[CoordCoarseIndex]))
-    gammaT = np.max(np.abs(fPatchNew[CoordCoarseIndex]))
+    # # Just taking max norm in the nodes. This is wrong since we want L2 Norm
+    nuT = np.max(np.abs(fElementOld - fElementNew))
+    gammaT = np.max(np.abs(fElementNew))
 
     return computeEftErrorIndicatorCoarseFromGreeks(etaT, cetaTPrime, (deltaMaxTPrime, kappaMaxT, nuT, gammaT))
 
@@ -592,7 +598,7 @@ def computeRhsCoarseQuantities(patch, corrector, aPatch, Eft=False):
     
     def accumulate(TPrimeInd, TPrimei, P, Q, KTPrime, BTPrimeij, CTPrimeij):
         Rmsi[TPrimei] = BTPrimeij[:,0]
-        cetaTPrime[TPrimeInd] = CTPrimeij
+        cetaTPrime[TPrimeInd] = CTPrimeij       # < -- This is new !! is that correct ?
 
     performTPrimeLoop(patch, lambdasList, [corrector], aPatch, accumulate)
 
@@ -670,4 +676,6 @@ def computeSupremumForEf(patch,aPatch):
 
     # Compute the supremum
     supremum = scipy.sparse.linalg.eigsh(L[1:, 1:], 1, R[1:, 1:])[0]
-    return supremum
+
+    # TODO: I am not sure whether I want to have a square root here !
+    return supremum[0]
