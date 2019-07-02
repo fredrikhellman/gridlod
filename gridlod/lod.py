@@ -330,9 +330,6 @@ def computeEftErrorIndicatorCoarseFromGreeks(etaT, cetaTPrime, greeksPatch):
 
     deltaMaxTPrime, kappaMaxT, xiMaxT, nuT, gammaT = greeksPatch
 
-    # check the quantities
-    # print('nu: {}, gamma: {}, eta: {}, kappa: {}'.format(nuT,gammaT,etaT,kappaMaxT))
-
     if np.isclose(gammaT,0):
         return 0
     else:
@@ -462,17 +459,9 @@ def computeEftErrorIndicatorCoarse(patch, cetaTPrime, aPatchOld, aPatchNew, fEle
         xiMaxT = np.sqrt(np.max(np.abs(1./aNewOneLayerPatch)))
 
     MElement = fem.assemblePatchMatrix(patch.world.NCoarseElement, world.MLocFine)
-    nuT = np.dot((fElementOld - fElementNew),
-                MElement * (fElementOld - fElementNew))
-    gammaT = np.dot(fElementNew, MElement * fElementNew)
-
-    # print("l2", nuT,gammaT)
-
-    # # Just taking max norm in the nodes. This is wrong since we want L2 Norm
-    nuT = np.sqrt(np.max(np.abs(fElementOld - fElementNew)))
-    gammaT = np.sqrt(np.max(np.abs(fElementNew)))
-
-    # print("max", nuT,gammaT)
+    nuT = np.sqrt(np.dot((fElementOld - fElementNew),
+                MElement * (fElementOld - fElementNew)))
+    gammaT = np.sqrt(np.dot(fElementNew, MElement * fElementNew))
 
     etaT = 0.25 * 1./patch.world.NWorldCoarse[0]
 
