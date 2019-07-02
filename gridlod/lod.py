@@ -434,8 +434,18 @@ def computeEftErrorIndicatorCoarse(patch, cetaTPrime, aPatchOld, aPatchNew, fEle
     aTPrime = aNew[TPrimeIndices]
     aOldTPrime = aOld[TPrimeIndices]
 
+    # U(T) has to be subset of the patch
+    assert(patch.k >= 1)
+    patchAsWorld = gridlod.world.World(patch.NPatchCoarse, NCoarseElement)
+    patchTInd = util.convertpCoordIndexToLinearIndex(NPatchCoarse-1, iElementPatchCoarse)
+    oneLayerPatch = gridlod.world.Patch(patchAsWorld, 1, patchTInd)
+    TPrimesInOneLayerPatchStartIndex = util.convertpCoordIndexToLinearIndex(NPatchCoarse-1, oneLayerPatch.iPatchWorldCoarse)
+    TPrimesInOneLayerPatchIndexMap = util.lowerLeftpIndexMap(oneLayerPatch.NPatchCoarse-1, NPatchCoarse-1)
+    aNewOneLayerPatch = aTPrime[TPrimesInOneLayerPatchStartIndex + TPrimesInOneLayerPatchIndexMap]
+
     if aNew.ndim == 3:
         aInvTPrime = np.linalg.inv(aTPrime)
+        aNewInveOneLayerPatch = np.linalg.inv(aNewOneLayerPatch)
         aOldInvTPrime = np.linalg.inv(aOldTPrime)
         aDiffTPrime = aTPrime - aOldTPrime
         deltaMaxTPrime = np.sqrt(np.max(np.linalg.norm(np.einsum('Ttij, Ttjk, Ttkl, Ttlm -> Ttim',
@@ -445,14 +455,11 @@ def computeEftErrorIndicatorCoarse(patch, cetaTPrime, aPatchOld, aPatchNew, fEle
         kappaMaxT = np.sqrt(np.max(np.linalg.norm(np.einsum('tij, tjk -> tik',
                                                             aOldTPrime[elementCoarseIndex], aInvTPrime[elementCoarseIndex]),
                                                   axis=(1,2), ord=2)))
-        xiMaxT = np.sqrt(np.max(np.linalg.norm(aInvTPrime, axis=(1,2), ord=2)))  # <-- This patch is too big ! We need one layer patch
+        xiMaxT = np.sqrt(np.max(np.linalg.norm(aNewInveOneLayerPatch, axis=(1,2), ord=2)))
     else:
         deltaMaxTPrime = np.max(np.abs((aTPrime - aOldTPrime)/np.sqrt(aTPrime*aOldTPrime)), axis=1)
         kappaMaxT = np.sqrt(np.max(np.abs(aOldTPrime[elementCoarseIndex] / aTPrime[elementCoarseIndex])))
-        xiMaxT = np.sqrt(np.max(np.abs(np.linalg.norm(1./aTPrime))))   # <-- This patch is too big ! We need one layer patch
-
-    # #TODO: THIS IS WRONG... I tried to compute L2 norm here
-    # --> fElement is defined on all the fine nodes which is wrong.
+        xiMaxT = np.sqrt(np.max(np.abs(1./aNewOneLayerPatch)))
 
     MElement = fem.assemblePatchMatrix(patch.world.NCoarseElement, world.MLocFine)
     nuT = np.dot((fElementOld - fElementNew),
