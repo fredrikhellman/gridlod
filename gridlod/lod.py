@@ -10,7 +10,7 @@ from . import linalg
 from . import coef
 from . import transport
 from . import interp
-import gridlod
+from . import world
 
 # Saddle point problem solvers
 class NullspaceSolver:
@@ -407,9 +407,8 @@ def computeEftErrorIndicatorCoarse(patch, cetaTPrime, aPatchOld, aPatchNew, fEle
     aOld = aPatchOld
     aNew = aPatchNew
 
-    world = patch.world
     NPatchCoarse = patch.NPatchCoarse
-    NCoarseElement = world.NCoarseElement
+    NCoarseElement = patch.world.NCoarseElement
     NPatchFine = NPatchCoarse*NCoarseElement
     iElementPatchCoarse = patch.iElementPatchCoarse
 
@@ -433,9 +432,9 @@ def computeEftErrorIndicatorCoarse(patch, cetaTPrime, aPatchOld, aPatchNew, fEle
 
     # U(T) has to be subset of the patch
     assert(patch.k >= 1)
-    patchAsWorld = gridlod.world.World(patch.NPatchCoarse, NCoarseElement)
+    patchAsWorld = world.World(patch.NPatchCoarse, NCoarseElement)
     patchTInd = util.convertpCoordIndexToLinearIndex(NPatchCoarse-1, iElementPatchCoarse)
-    oneLayerPatch = gridlod.world.Patch(patchAsWorld, 1, patchTInd)
+    oneLayerPatch = world.Patch(patchAsWorld, 1, patchTInd)
     TPrimesInOneLayerPatchStartIndex = util.convertpCoordIndexToLinearIndex(NPatchCoarse-1, oneLayerPatch.iPatchWorldCoarse)
     TPrimesInOneLayerPatchIndexMap = util.lowerLeftpIndexMap(oneLayerPatch.NPatchCoarse-1, NPatchCoarse-1)
     aNewOneLayerPatch = aTPrime[TPrimesInOneLayerPatchStartIndex + TPrimesInOneLayerPatchIndexMap]
@@ -458,7 +457,7 @@ def computeEftErrorIndicatorCoarse(patch, cetaTPrime, aPatchOld, aPatchNew, fEle
         kappaMaxT = np.sqrt(np.max(np.abs(aOldTPrime[elementCoarseIndex] / aTPrime[elementCoarseIndex])))
         xiMaxT = np.sqrt(np.max(np.abs(1./aNewOneLayerPatch)))
 
-    MElement = fem.assemblePatchMatrix(patch.world.NCoarseElement, world.MLocFine)
+    MElement = fem.assemblePatchMatrix(patch.world.NCoarseElement, patch.world.MLocFine)
     nuT = np.sqrt(np.dot((fElementOld - fElementNew),
                 MElement * (fElementOld - fElementNew)))
     gammaT = np.sqrt(np.dot(fElementNew, MElement * fElementNew))
