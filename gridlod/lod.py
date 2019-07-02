@@ -10,6 +10,7 @@ from . import linalg
 from . import coef
 from . import transport
 from . import interp
+import gridlod
 
 # Saddle point problem solvers
 class NullspaceSolver:
@@ -305,7 +306,7 @@ def computeErrorIndicatorCoarseFromGreeks(patch, muTPrime, greeksPatch):
 
     deltaMaxTPrime, kappaMaxT = greeksPatch
 
-    epsilonTSquare = kappaMaxT**2 * np.sum((deltaMaxTPrime**2)*muTPrime) # TODO: is it really kappa**2? not kappa ?
+    epsilonTSquare = kappaMaxT**2 * np.sum((deltaMaxTPrime**2)*muTPrime)
 
     return np.sqrt(epsilonTSquare)
 
@@ -319,15 +320,15 @@ def computeEftErrorIndicatorCoarseFromGreeks(etaT, cetaTPrime, greeksPatch):
     kappaMaxT = || AOld^{1/2) ANew^{-1/2} ||_max(T)
                                  over the patch coarse T (patch.iPatchWorldCoarse)
 
-    nuT = || f - f_ref ||^2_L2(T)
+    nuT = || f - f_ref ||_L2(T)
 
-    gammaT = || f ||^2_L2(T)
+    gammaT = || f ||_L2(T)
     '''
 
     while callable(greeksPatch):
         greeksPatch = greeksPatch()
 
-    deltaMaxTPrime, kappaMaxT, nuT, gammaT = greeksPatch
+    deltaMaxTPrime, kappaMaxT, xiMaxT, nuT, gammaT = greeksPatch
 
     # check the quantities
     # print('nu: {}, gamma: {}, eta: {}, kappa: {}'.format(nuT,gammaT,etaT,kappaMaxT))
@@ -335,8 +336,7 @@ def computeEftErrorIndicatorCoarseFromGreeks(etaT, cetaTPrime, greeksPatch):
     if np.isclose(gammaT,0):
         return 0
     else:
-        # TODO: Check this guy carefully !
-        epsilonTSquare = 2 * kappaMaxT * nuT / gammaT * etaT + 2 * kappaMaxT * np.sum((deltaMaxTPrime**2)*cetaTPrime/gammaT)
+        epsilonTSquare = 2 * xiMaxT**2 * nuT**2 / gammaT**2 * etaT + 2 * kappaMaxT**2 * np.sum((deltaMaxTPrime**2)*cetaTPrime/gammaT**2)
 
     return np.sqrt(epsilonTSquare)
 
@@ -400,7 +400,7 @@ def computeErrorIndicatorCoarseFromCoefficients(patch, muTPrime, aPatchOld, aPat
 
     return computeErrorIndicatorCoarseFromGreeks(patch, muTPrime, (deltaMaxTPrime, kappaMaxT))
 
-def computeEftErrorIndicatorCoarse(patch, cetaTPrime, etaT, aPatchOld, aPatchNew, fElementOld, fElementNew):
+def computeEftErrorIndicatorCoarse(patch, cetaTPrime, aPatchOld, aPatchNew, fElementOld, fElementNew):
     while callable(aPatchOld):
         aPatchOld = aPatchOld()
 
@@ -445,23 +445,31 @@ def computeEftErrorIndicatorCoarse(patch, cetaTPrime, etaT, aPatchOld, aPatchNew
         kappaMaxT = np.sqrt(np.max(np.linalg.norm(np.einsum('tij, tjk -> tik',
                                                             aOldTPrime[elementCoarseIndex], aInvTPrime[elementCoarseIndex]),
                                                   axis=(1,2), ord=2)))
+        xiMaxT = np.sqrt(np.max(np.linalg.norm(aInvTPrime, axis=(1,2), ord=2)))  # <-- This patch is too big ! We need one layer patch
     else:
         deltaMaxTPrime = np.max(np.abs((aTPrime - aOldTPrime)/np.sqrt(aTPrime*aOldTPrime)), axis=1)
         kappaMaxT = np.sqrt(np.max(np.abs(aOldTPrime[elementCoarseIndex] / aTPrime[elementCoarseIndex])))
+        xiMaxT = np.sqrt(np.max(np.abs(np.linalg.norm(1./aTPrime))))   # <-- This patch is too big ! We need one layer patch
 
     # #TODO: THIS IS WRONG... I tried to compute L2 norm here
+    # --> fElement is defined on all the fine nodes which is wrong.
 
-    # P = fem.assembleProlongationMatrix(patch.NPatchCoarse, patch.world.NCoarseElement)
-    # MLoc = fem.assemblePatchMatrix(patch.NPatchFine, world.MLocFine)
-    # nuT = np.dot((fPatchOld[elementCoarseIndex] - fPatchNew[elementCoarseIndex]),
-    #             MLoc * (fPatchOld[elementCoarseIndex] - fPatchNew[elementCoarseIndex]))
-    # gammaT = np.dot(fPatchNew[elementCoarseIndex], MLoc * fPatchNew[elementCoarseIndex])
+    MElement = fem.assemblePatchMatrix(patch.world.NCoarseElement, world.MLocFine)
+    nuT = np.dot((fElementOld - fElementNew),
+                MElement * (fElementOld - fElementNew))
+    gammaT = np.dot(fElementNew, MElement * fElementNew)
+
+    # print("l2", nuT,gammaT)
 
     # # Just taking max norm in the nodes. This is wrong since we want L2 Norm
-    nuT = np.max(np.abs(fElementOld - fElementNew))
-    gammaT = np.max(np.abs(fElementNew))
+    nuT = np.sqrt(np.max(np.abs(fElementOld - fElementNew)))
+    gammaT = np.sqrt(np.max(np.abs(fElementNew)))
 
-    return computeEftErrorIndicatorCoarseFromGreeks(etaT, cetaTPrime, (deltaMaxTPrime, kappaMaxT, nuT, gammaT))
+    # print("max", nuT,gammaT)
+
+    etaT = 0.25 * 1./patch.world.NWorldCoarse[0]
+
+    return computeEftErrorIndicatorCoarseFromGreeks(etaT, cetaTPrime, (deltaMaxTPrime, kappaMaxT, xiMaxT, nuT, gammaT))
 
 def performTPrimeLoop(patch, lambdasList, correctorsList, aPatch, accumulate):
 
@@ -598,7 +606,7 @@ def computeRhsCoarseQuantities(patch, corrector, aPatch, Eft=False):
     
     def accumulate(TPrimeInd, TPrimei, P, Q, KTPrime, BTPrimeij, CTPrimeij):
         Rmsi[TPrimei] = BTPrimeij[:,0]
-        cetaTPrime[TPrimeInd] = CTPrimeij       # < -- This is new !! is that correct ?
+        cetaTPrime[TPrimeInd] = CTPrimeij
 
     performTPrimeLoop(patch, lambdasList, [corrector], aPatch, accumulate)
 
@@ -646,36 +654,3 @@ def computeCoarseQuantitiesFlux(patch, correctorsList, aPatch):
                                                             NCoarseElement, aPatch, localBasisExtended)[:,TInd,:]
     return CoarseScaleInformationFlux(correctorFluxTF, basisFluxTF)
 
-def computeSupremumForEf(patch,aPatch):
-
-    while callable(aPatch):
-        aPatch = aPatch()
-
-    # Make an indicator function for the center element in the patch
-    indicatorT = np.zeros(patch.NtFine, dtype=np.float64)
-    tIndicesForT = util.extractElementFine(patch.NPatchCoarse,
-                                                   patch.world.NCoarseElement,
-                                                   patch.iElementPatchCoarse,
-                                                   extractElements=True)
-    indicatorT[tIndicesForT] = 1
-    # Compute IH for the patch
-    IH = interp.L2ProjectionPatchMatrix(patch)
-    # Compute AFine for the patch
-    AFine = fem.assemblePatchMatrix(patch.NPatchFine, patch.world.ALocFine, aPatch)
-    # Compute MFine for only the center element
-    MFine = fem.assemblePatchMatrix(patch.NPatchFine, patch.world.MLocFine, indicatorT)
-    # Identity matrix
-    E = scipy.sparse.identity(IH.shape[1])
-    # Prolongation
-    P = fem.assembleProlongationMatrix(patch.NPatchCoarse, patch.world.NCoarseElement)
-
-    # ATTENTION: This is really expensive !
-    # Setup left and right hand sides of the generalized eigenvalue problem
-    L = (E - P * IH).T * MFine * (E - P * IH)
-    R = AFine
-
-    # Compute the supremum
-    supremum = scipy.sparse.linalg.eigsh(L[1:, 1:], 1, R[1:, 1:])[0]
-
-    # TODO: I am not sure whether I want to have a square root here !
-    return supremum[0]
