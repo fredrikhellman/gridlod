@@ -462,6 +462,7 @@ def computeEftErrorIndicatorCoarse(patch, cetaTPrime, aPatchOld, aPatchNew, fEle
                 MElement * (fElementOld - fElementNew)))
     gammaT = np.sqrt(np.dot(fElementNew, MElement * fElementNew))
 
+    # Should be generalized: etaT is based on a L2-projection and averaging and square elements in 2D.
     etaT = 0.25 * 1./patch.world.NWorldCoarse[0]
 
     return computeEftErrorIndicatorCoarseFromGreeks(etaT, cetaTPrime, (deltaMaxTPrime, kappaMaxT, xiMaxT, nuT, gammaT))
