@@ -310,7 +310,7 @@ def computeErrorIndicatorCoarseFromGreeks(patch, muTPrime, greeksPatch):
 
     return np.sqrt(epsilonTSquare)
 
-def computeEftErrorIndicatorCoarseFromGreeks(etaT, cetaTPrime, greeksPatch):
+def computeEftErrorIndicatorsCoarseFromGreeks(etaT, cetaTPrime, greeksPatch):
     '''Compute the coarse error idicator E(T) from the "greeks" delta and kappa,
     where
 
@@ -322,7 +322,6 @@ def computeEftErrorIndicatorCoarseFromGreeks(etaT, cetaTPrime, greeksPatch):
 
     nuT = || f - f_ref ||_L2(T)
 
-    gammaT = || f ||_L2(T)
     '''
 
     while callable(greeksPatch):
@@ -330,12 +329,9 @@ def computeEftErrorIndicatorCoarseFromGreeks(etaT, cetaTPrime, greeksPatch):
 
     deltaMaxTPrime, kappaMaxT, xiMaxT, nuT, gammaT = greeksPatch
 
-    if np.isclose(gammaT,0):
-        return 0
-    else:
-        epsilonTSquare = 2 * xiMaxT**2 * nuT**2 / gammaT**2 * etaT + 2 * kappaMaxT**2 * np.sum((deltaMaxTPrime**2)*cetaTPrime/gammaT**2)
-
-    return np.sqrt(epsilonTSquare)
+    eft_square = xiMaxT**2 * nuT**2 * etaT
+    eRft_square = kappaMaxT**2 * np.sum((deltaMaxTPrime**2)*cetaTPrime)
+    return np.sqrt(eft_square), np.sqrt(eRft_square)
 
 
 def computeErrorIndicatorCoarseFromCoefficients(patch, muTPrime, aPatchOld, aPatchNew):
@@ -397,7 +393,7 @@ def computeErrorIndicatorCoarseFromCoefficients(patch, muTPrime, aPatchOld, aPat
 
     return computeErrorIndicatorCoarseFromGreeks(patch, muTPrime, (deltaMaxTPrime, kappaMaxT))
 
-def computeEftErrorIndicatorCoarse(patch, cetaTPrime, aPatchOld, aPatchNew, fElementOld, fElementNew):
+def computeEftErrorIndicatorsCoarse(patch, cetaTPrime, aPatchOld, aPatchNew, fElementOld, fElementNew):
     while callable(aPatchOld):
         aPatchOld = aPatchOld()
 
@@ -465,7 +461,7 @@ def computeEftErrorIndicatorCoarse(patch, cetaTPrime, aPatchOld, aPatchNew, fEle
     # Should be generalized: etaT is based on a L2-projection and averaging and square elements in 2D.
     etaT = 0.25 * 1./patch.world.NWorldCoarse[0]
 
-    return computeEftErrorIndicatorCoarseFromGreeks(etaT, cetaTPrime, (deltaMaxTPrime, kappaMaxT, xiMaxT, nuT, gammaT))
+    return computeEftErrorIndicatorsCoarseFromGreeks(etaT, cetaTPrime, (deltaMaxTPrime, kappaMaxT, xiMaxT, nuT, gammaT))
 
 def performTPrimeLoop(patch, lambdasList, correctorsList, aPatch, accumulate):
 
