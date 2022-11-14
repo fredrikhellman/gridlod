@@ -15,10 +15,19 @@ usage.
 
 ## Required packages
 
-These packages might be needed:
+These `python` packages are needed:
 * `scikit-sparse`
 * `numpy`
 * `scipy`
+
+For installing [`scikit-sparse`](https://github.com/scikit-sparse/scikit-sparse),
+the library `suite-sparse` is required.
+As also highlighted [here](https://github.com/scikit-sparse/scikit-sparse),
+there may appear problems installing `scikit-sparse` on a Mac,
+which is due to the `suite-sparse` location not being installed at the right place.
+For fixing this, just find out your `lib` and `include` directory of your `suite-sparse`
+and use the respective `pip install` command which defines
+`SUITESPARSE_INCLUDE_DIR` and `SUITESPARSE_LIBRARY_DIR` manually.
 
 ## Getting started
 You can find some examples on how to use it in the test directory
