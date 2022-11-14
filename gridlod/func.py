@@ -56,7 +56,7 @@ def evaluateCQ1(N, cq1, coordinates):
     interpolationWeights = np.zeros((coordinates.shape[0], 2**d))
     for localNode in range(2**d):
         localNodeBinaryString = bin(localNode)[2:].zfill(d)[::-1]
-        localNodeBitmap = np.array([0 if bit is '0' else 1 for bit in localNodeBinaryString])
+        localNodeBitmap = np.array([0 if bit == '0' else 1 for bit in localNodeBinaryString])
 
         # This computes the value of the basis function at node
         # localNode for all points. It is a product of either x_k or
@@ -97,7 +97,7 @@ def evaluateCQ1D(N, cq1, coordinates):
     interpolationWeights = np.zeros((coordinates.shape[0], 2**d, d))
     for localNode in range(2**d):
         localNodeBinaryString = bin(localNode)[2:].zfill(d)[::-1]
-        localNodeBitmap = np.array([0 if bit is '0' else 1 for bit in localNodeBinaryString])
+        localNodeBitmap = np.array([0 if bit == '0' else 1 for bit in localNodeBinaryString])
         for dimensionToDifferentiate in range(d):
             # These are the factors x_k or (1-x_k)
             interpolationWeightsFactors = (1.0 - localNodeBitmap) + (2.0*localNodeBitmap - 1.0)*coordIndicesFpart
